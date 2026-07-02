@@ -14,7 +14,7 @@
 
     <groupId>dev.resteasy.providers</groupId>
     <artifactId>resteasy-jackson-provider</artifactId>
-    <version>1.0.0.Alpha1-SNAPSHOT</version>
+    <version>1.0.0.Alpha1</version>
     <packaging>jar</packaging>
     <name>RESTEasy Jackson Provider</name>
     <description>A Jakarta REST provider for Jackson with RESTEasy</description>
@@ -49,7 +49,7 @@
         <connection>scm:git:git://git@github.com:resteasy/resteasy-jackson-provider.git</connection>
         <developerConnection>scm:git:git://git@github.com:resteasy/resteasy-jackson-provider.git</developerConnection>
         <url>git://github.com/resteasy/resteasy-jackson-provider.git</url>
-        <tag>HEAD</tag>
+        <tag>v1.0.0.Alpha1</tag>
     </scm>
 
     <issueManagement>
@@ -270,9 +270,9 @@
                             <!-- default one fails to process the classes -->
                             <engine>cleanthat-javaparser-unnecessaryimport</engine>
                         </removeUnusedImports>
-                        <forbidWildcardImports/>
-                        <trimTrailingWhitespace/>
-                        <endWithNewline/>
+                        <forbidWildcardImports />
+                        <trimTrailingWhitespace />
+                        <endWithNewline />
                         <licenseHeader>
                             <file>license-java-asl-header</file>
                             <!-- Delimiter is a regex which identifies the "top" of the file i.e. all above it is considered a header -->
@@ -290,8 +290,8 @@
                                 <include>pom.xml</include>
                                 <include>src/**/*.xml</include>
                             </includes>
-                            <trimTrailingWhitespace/>
-                            <endWithNewline/>
+                            <trimTrailingWhitespace />
+                            <endWithNewline />
                             <licenseHeader>
                                 <file>license-xml-asl-header</file>
                                 <!-- Delimiter is a regex which identifies the "top" of the file i.e. all above it is considered a header -->
