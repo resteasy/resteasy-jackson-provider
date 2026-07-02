@@ -10,9 +10,11 @@ updates:
     schedule:
       interval: "daily"
     ignore:
-      - dependency-name: 'jakarta.ws.rs:jakarta.ws.rs-api'
+      - dependency-name: 'jakarta.platform:*'
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: 'org.jboss.resteasy:*'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      - dependency-name: 'tools.jackson:*'
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
       - dependency-name: 'org.junit*'
         update-types: ['version-update:semver-major', 'version-update:semver-minor']
