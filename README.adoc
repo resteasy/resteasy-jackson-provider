@@ -1,0 +1,227 @@
+= RESTEasy Jackson Provider
+:toc:
+
+A Jakarta REST provider for Jackson integration with RESTEasy. This provider supports Jackson 3.x and includes support for JSON Patch (RFC 6902) and JSON Merge Patch (RFC 7396).
+
+== Overview
+
+The RESTEasy Jackson Provider offers Jackson integration for Jakarta REST applications targeting RESTEasy, including:
+
+* JSON serialization/deserialization using Jackson
+* JSON Patch (RFC 6902) support
+* JSON Merge Patch (RFC 7396) support
+* Jakarta JSON-P integration
+* JSR-310 date/time support
+* Polymorphic type handling with allowlist validation
+* RESTEasy tracing integration
+
+== Usage
+
+=== Dependencies
+
+Add the RESTEasy Jackson Provider to your project:
+
+[source,xml]
+----
+<dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.jboss.resteasy</groupId>
+            <artifactId>resteasy-bom</artifactId>
+            <version>${version.org.jboss.resteasy}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+        <dependency>
+            <groupId>tools.jackson</groupId>
+            <artifactId>jackson-bom</artifactId>
+            <version>${version.com.fasterxml.jackson}</version>
+            <type>pom</type>
+            <scope>import</scope>
+        </dependency>
+    </dependencies>
+</dependencyManagement>
+<dependencies>
+    <dependency>
+        <groupId>dev.resteasy.providers</groupId>
+        <artifactId>resteasy-jackson-provider</artifactId>
+        <version>${version.dev.resteasy.providers.jackson}</version>
+    </dependency>
+</dependencies>
+----
+
+The provider is automatically registered via the `JacksonFeature` class when present on the classpath.
+
+=== Basic JSON Endpoints
+
+[source,java]
+----
+@Path("/api")
+public class MyResource {
+
+    @GET
+    @Path("/data")
+    @Produces(MediaType.APPLICATION_JSON)
+    public MyData getData() {
+        return new MyData("example", 42);
+    }
+
+    @POST
+    @Path("/data")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public MyData createData(MyData data) {
+        // Process the data
+        return data;
+    }
+}
+----
+
+=== Pretty-Printed Output
+
+// TODO (jrp) remove this or show the Jackson way of doing it. There is no need for this annotation
+Use the `@Formatted` annotation to enable pretty-printing for specific endpoints:
+
+[source,java]
+----
+@GET
+@Path("/formatted")
+@Produces(MediaType.APPLICATION_JSON)
+@Formatted
+public MyData getFormattedData() {
+    return new MyData("example", 42);
+}
+----
+
+=== JSON Patch Support
+
+JSON Patch (RFC 6902) allows you to express a sequence of operations to apply to a JSON document:
+
+[source,java]
+----
+@PATCH
+@Path("/customer/{id}")
+@Consumes("application/json-patch+json")
+@Produces(MediaType.APPLICATION_JSON)
+public Customer patchCustomer(@PathParam("id") String id, JsonObjectPatch patch) {
+    Customer customer = findCustomer(id);
+    return patch.apply(customer, Customer.class);
+}
+----
+
+Example JSON Patch request:
+[source,json]
+----
+[
+  { "op": "replace", "path": "/name", "value": "New Name" },
+  { "op": "add", "path": "/tags/-", "value": "new-tag" },
+  { "op": "remove", "path": "/temporary" }
+]
+----
+
+=== JSON Merge Patch Support
+
+JSON Merge Patch (RFC 7396) provides a simpler patching mechanism:
+
+[source,java]
+----
+@PATCH
+@Path("/customer/{id}")
+@Consumes("application/merge-patch+json")
+@Produces(MediaType.APPLICATION_JSON)
+public Customer mergePatchCustomer(@PathParam("id") String id, JsonMergeObjectPatch patch) {
+    Customer customer = findCustomer(id);
+    return patch.apply(customer, Customer.class);
+}
+----
+
+Example JSON Merge Patch request:
+[source,json]
+----
+{
+  "name": "Updated Name",
+  "email": "newemail@example.com"
+}
+----
+
+== Configuration
+
+The provider can be configured using the `JacksonOptions` class to customize Jackson's `ObjectMapper`:
+
+[source,java]
+----
+@ApplicationScoped
+public class JacksonConfiguration implements JacksonOptions {
+
+    @Override
+    public ObjectMapper configure(ObjectMapper mapper) {
+        return mapper
+            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
+            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    }
+}
+----
+
+== Releasing
+
+Releasing the project requires permission to deploy to Maven Central see https://central.sonatype.org/publish/requirements/[Maven Central Release Requirements].
+Once everything is setup, you simply need to run the `./release.sh` script. There are two required parameters:
+
+. `-r` or `--release` which is the version you want to release
+. `-d` or `--development` which is the next development version.
+
+By default the release version cannot contain `SNAPSHOT` and the development version, must container `SNAPSHOT`.
+
+[source,bash]
+----
+.Example Command
+----
+./release -r 1.0.0.Final -d 1.0.1.Final-SNAPSHOT
+----
+----
+
+=== Supported Arguments
+
+|===
+|Argument | Requires Value | Description
+
+| `-d`, `--development`
+| Yes
+| The next version for the development cycle.
+
+| `-f`, `--force`
+| No
+| Forces to allow a SNAPSHOT suffix in release version and not require one for the development version.
+
+| `-h`, `--help`
+| N/A
+| Displays this help
+
+| `--notes-start-tag`
+| Unused
+| Passes the `--notes-from-tag` and the argument to the `gh create release` command.
+
+| `-p`, `--prerelease`
+| Unused
+| Passes the `--prerelease` to the `gh create release` command.
+
+| `-r`, `--release`
+| Yes
+| The version to be released. Also used for the tag.
+
+| `--dry-run`
+| No
+| Executes the release in as a dry-run. Nothing will be updated or pushed.
+
+| `--no-push`
+| No
+| Executes the release in, but doesn't actually push the changes to GitHub or publish the release on Maven Central.
+Any next steps should you want to continue the release will need to be manual.
+
+| `-v`, `--verbose`
+| No
+| Prints verbose output.
+
+|===
+
+Any additional arguments are considered arguments for the Maven command.
