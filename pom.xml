@@ -68,7 +68,7 @@
         <version.org.jboss.logmanager>3.2.2.Final</version.org.jboss.logmanager>
         <version.org.jboss.resteasy>6.2.16.Final</version.org.jboss.resteasy>
         <version.org.jboss.resteasy.extensions>2.0.2.Final</version.org.jboss.resteasy.extensions>
-        <version.org.jboss.resteasy.junit>1.0.0.Beta4</version.org.jboss.resteasy.junit>
+        <version.org.jboss.resteasy.junit>1.0.0.Beta5</version.org.jboss.resteasy.junit>
         <version.org.junit>6.1.2</version.org.junit>
         <version.tools.jackson>3.1.4</version.tools.jackson>
 
