@@ -25,7 +25,7 @@ import dev.resteasy.junit.extension.annotations.RestResource;
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */
-@RestBootstrap(resources = { CustomerResource.class })
+@RestBootstrap(CustomerResource.class)
 class JsonMergePatchTest {
 
     @RestResource

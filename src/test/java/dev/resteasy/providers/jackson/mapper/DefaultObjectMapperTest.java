@@ -15,7 +15,7 @@ import dev.resteasy.providers.jackson.mapper.resources.UserResource;
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-@RestBootstrap(resources = {
+@RestBootstrap({
         ContactResource.class,
         CrudResource.class,
         UserResource.class

@@ -29,9 +29,7 @@ import dev.resteasy.providers.jackson.allowlist.resources.land.Automobile;
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */
-@RestBootstrap(resources = {
-        PolymorphicResource.class,
-})
+@RestBootstrap(PolymorphicResource.class)
 public class PolymorphicTypeValidatorCatchAllTest {
 
     @BeforeAll

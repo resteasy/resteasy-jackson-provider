@@ -22,7 +22,7 @@ import tools.jackson.databind.json.JsonMapper;
  *
  * @author <a href="mailto:jperkins@redhat.com">James R. Perkins</a>
  */
-@RestBootstrap(resources = {
+@RestBootstrap({
         ContactResource.class,
         CrudResource.class,
         UserResource.class,
