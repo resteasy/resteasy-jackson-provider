@@ -172,11 +172,10 @@ class JacksonJsonPatch implements Function<JsonNode, JsonNode> {
             return value;
         }
 
-        final JsonNode result = target.deepCopy();
         final JsonPointer parentPath = path.head();
         final String fieldName = getLastSegment(path);
 
-        JsonNode parent = result.at(parentPath);
+        JsonNode parent = target.at(parentPath);
 
         if (parent.isMissingNode()) {
             throw JacksonLogger.LOGGER.parentPathDoesNotExist(parentPath);
@@ -203,15 +202,14 @@ class JacksonJsonPatch implements Function<JsonNode, JsonNode> {
             throw JacksonLogger.LOGGER.cannotAddToNode(parentPath);
         }
 
-        return result;
+        return target;
     }
 
     private JsonNode removeValue(final JsonNode target, final JsonPointer path) {
-        final JsonNode result = target.deepCopy();
         final JsonPointer parentPath = path.head();
         final String fieldName = getLastSegment(path);
 
-        final JsonNode parent = result.at(parentPath);
+        final JsonNode parent = target.at(parentPath);
 
         if (parent.isMissingNode()) {
             throw JacksonLogger.LOGGER.parentPathDoesNotExist(parentPath);
@@ -238,7 +236,7 @@ class JacksonJsonPatch implements Function<JsonNode, JsonNode> {
             throw JacksonLogger.LOGGER.cannotRemoveFromNode(parentPath);
         }
 
-        return result;
+        return target;
     }
 
     private JsonPointer getPointer(final JsonNode operation, final String field) {
@@ -262,8 +260,6 @@ class JacksonJsonPatch implements Function<JsonNode, JsonNode> {
     }
 
     private String getLastSegment(final JsonPointer pointer) {
-        final String path = pointer.toString();
-        final int lastSlash = path.lastIndexOf('/');
-        return path.substring(lastSlash + 1);
+        return pointer.last().getMatchingProperty();
     }
 }
