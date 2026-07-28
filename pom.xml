@@ -73,7 +73,7 @@
         <version.tools.jackson>3.1.5</version.tools.jackson>
 
         <!-- Plugin versions -->
-        <version.spotless-maven-plugin>3.8.0</version.spotless-maven-plugin>
+        <version.spotless-maven-plugin>3.9.0</version.spotless-maven-plugin>
 
         <!-- Configuration properties -->
         <skipFormatting>false</skipFormatting>
