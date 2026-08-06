@@ -13,6 +13,7 @@ import jakarta.ws.rs.ext.Providers;
 import dev.resteasy.providers.jackson.AllowListPolymorphicTypeValidatorBuilder;
 
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
 
 /**
  *
@@ -26,8 +27,6 @@ abstract class ObjectMapperProvider {
     private volatile JsonMapper jsonMapper;
 
     JsonMapper locateMapper(final Class<?> type, final MediaType mediaType) {
-        // TODO (jrp) look at the tools.jackson.jakarta.rs.json.JacksonJsonProvider.locateMapper() and do something
-        // TODO (jrp) similar
         JsonMapper currentObjectMapper = jsonMapper;
         if (currentObjectMapper == null) {
             synchronized (this) {
@@ -35,22 +34,18 @@ abstract class ObjectMapperProvider {
                 if (currentObjectMapper == null) {
                     final JsonMapper contextMapper = resolveContextJsonMapper(type, mediaType);
                     if (contextMapper != null) {
-                        currentObjectMapper = contextMapper
-                                .rebuild()
-                                .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
-                                .build();
-
+                        if (contextMapper.deserializationConfig()
+                                .getPolymorphicTypeValidator() instanceof DefaultBaseTypeLimitingValidator) {
+                            currentObjectMapper = contextMapper
+                                    .rebuild()
+                                    .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
+                                    .build();
+                        } else {
+                            currentObjectMapper = contextMapper;
+                        }
                     } else {
                         currentObjectMapper = createDefaultObjectMapper();
                     }
-                    // TODO (jrp) for now we will always add our AllowListPolymorphicTypeValidatorBuilder, but we need to
-                    // TODO (jrp) determine if that is correct.
-                    //PolymorphicTypeValidator ptv = mapper.getPolymorphicTypeValidator();
-                    //the check is protected by test dev.resteasy.providers.jackson.allowlist.JacksonConfig,
-                    //be sure to keep that in synch if changing anything here.
-                    //if (ptv == null || ptv instanceof LaissezFaireSubTypeValidator) {
-                    //    mapper.setPolymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build());
-                    //}
 
                     this.jsonMapper = currentObjectMapper;
                 }
@@ -71,17 +66,8 @@ abstract class ObjectMapperProvider {
     }
 
     private JsonMapper createDefaultObjectMapper() {
-        JsonMapper mapper = JsonMapper.builder()
+        return JsonMapper.builder()
                 .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
                 .build();
-        // TODO (jrp) for now we will always add our AllowListPolymorphicTypeValidatorBuilder, but we need to
-        // TODO (jrp) determine if that is correct.
-        //PolymorphicTypeValidator ptv = mapper.getPolymorphicTypeValidator();
-        //the check is protected by test dev.resteasy.providers.jackson.allowlist.JacksonConfig,
-        //be sure to keep that in synch if changing anything here.
-        //if (ptv == null || ptv instanceof LaissezFaireSubTypeValidator) {
-        //   mapper.setPolymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build());
-        //}
-        return mapper;
     }
 }

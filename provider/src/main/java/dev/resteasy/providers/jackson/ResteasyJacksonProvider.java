@@ -38,6 +38,7 @@ import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
 import tools.jackson.jakarta.rs.base.util.ClassKey;
 import tools.jackson.jakarta.rs.cfg.ObjectWriterInjector;
 import tools.jackson.jakarta.rs.cfg.ObjectWriterModifier;
@@ -157,18 +158,12 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
         endpoint = _readers.get(key);
         // not yet resolved (or not cached any more)? Resolve!
         if (endpoint == null) {
-            JsonMapper mapper = locateMapper(type, mediaType)
-                    .rebuild()
-                    .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
-                    .build();
-            // TODO (jrp) for now we will always add our AllowListPolymorphicTypeValidatorBuilder, but we need to
-            // TODO (jrp) determine if that is correct.
-            //PolymorphicTypeValidator ptv = mapper.getPolymorphicTypeValidator();
-            //the check is protected by test dev.resteasy.providers.jackson.allowlist.JacksonConfig,
-            //be sure to keep that in synch if changing anything here.
-            //if (ptv == null || ptv instanceof LaissezFaireSubTypeValidator) {
-            //    mapper.setPolymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build());
-            //}
+            JsonMapper mapper = locateMapper(type, mediaType);
+            if (mapper.deserializationConfig().getPolymorphicTypeValidator() instanceof DefaultBaseTypeLimitingValidator) {
+                mapper = mapper.rebuild()
+                        .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
+                        .build();
+            }
             endpoint = _configForReading(mapper, annotations, null);
             _readers.put(key, endpoint);
         }
@@ -276,18 +271,12 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
 
         // not yet resolved (or not cached any more)? Resolve!
         if (endpoint == null) {
-            JsonMapper mapper = locateMapper(type, mediaType)
-                    .rebuild()
-                    .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
-                    .build();
-            // TODO (jrp) for now we will always add our AllowListPolymorphicTypeValidatorBuilder, but we need to
-            // TODO (jrp) determine if that is correct.
-            //PolymorphicTypeValidator ptv = mapper.getPolymorphicTypeValidator();
-            //the check is protected by test dev.resteasy.providers.jackson.allowlist.JacksonConfig,
-            //be sure to keep that in synch if changing anything here.
-            //if (ptv == null || ptv instanceof LaissezFaireSubTypeValidator) {
-            //    mapper.setPolymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build());
-            //}
+            JsonMapper mapper = locateMapper(type, mediaType);
+            if (mapper.serializationConfig().getPolymorphicTypeValidator() instanceof DefaultBaseTypeLimitingValidator) {
+                mapper = mapper.rebuild()
+                        .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
+                        .build();
+            }
             endpoint = _configForWriting(mapper, annotations, null);
 
             // and cache for future reuse
