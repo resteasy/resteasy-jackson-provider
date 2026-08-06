@@ -1,0 +1,99 @@
+[[json-patch]]
+
+== JSON Patch and JSON Merge Patch
+
+The provider includes support for modifying resources using JSON Patch
+(https://datatracker.ietf.org/doc/html/rfc6902[RFC 6902]) and JSON Merge Patch
+(https://datatracker.ietf.org/doc/html/rfc7396[RFC 7396]). Both use the
+`dev.resteasy.providers.jackson.patch.ObjectPatch` interface as the parameter type in resource methods. The media
+type on `@Consumes` determines which patch format is used.
+
+=== JSON Patch (RFC 6902)
+
+JSON Patch expresses a sequence of operations (add, remove, replace, move, copy, test) to apply to a JSON document.
+Use the media type `application/json-patch+json`.
+
+[source,java]
+----
+@PATCH
+@Path("/customer/{id}")
+@Consumes("application/json-patch+json")
+@Produces(MediaType.APPLICATION_JSON)
+public Customer patchCustomer(@PathParam("id") String id, ObjectPatch patch) {
+    Customer customer = findCustomer(id);
+    return patch.apply(customer);
+}
+----
+
+Example request body:
+
+[source,json]
+----
+[
+    {"op": "replace", "path": "/name", "value": "New Name"},
+    {"op": "add", "path": "/tags/-", "value": "new-tag"},
+    {"op": "remove", "path": "/temporary"}
+]
+----
+
+The supported operations are:
+
+[cols="1,2", options="header"]
+|===
+| Operation
+| Description
+
+| `add`
+| Add a value to an object or array
+
+| `remove`
+| Remove a value from an object or array
+
+| `replace`
+| Replace an existing value
+
+| `move`
+| Move a value from one path to another
+
+| `copy`
+| Copy a value from one path to another
+
+| `test`
+| Test that a value at a path equals the specified value
+|===
+
+Patch application is atomic -- a deep copy of the target object is made before applying operations. If any operation
+fails, the original object is unchanged.
+
+=== JSON Merge Patch (RFC 7396)
+
+JSON Merge Patch provides a simpler patching mechanism. Use the media type `application/merge-patch+json`.
+
+[source,java]
+----
+@PATCH
+@Path("/customer/{id}")
+@Consumes("application/merge-patch+json")
+@Produces(MediaType.APPLICATION_JSON)
+public Customer mergePatchCustomer(@PathParam("id") String id, ObjectPatch patch) {
+    Customer customer = findCustomer(id);
+    return patch.apply(customer);
+}
+----
+
+Example request body:
+
+[source,json]
+----
+{
+    "name": "Updated Name",
+    "email": null
+}
+----
+
+Merge patch semantics:
+
+* Setting a field to a value updates that field
+* Setting a field to `null` removes it
+* Object values are merged recursively
+* Array values are replaced entirely (not merged element-by-element)

@@ -1,0 +1,42 @@
+= RESTEasy Jackson Provider Reference Guide
+:doctype: book
+:sectnums:
+:toc: left
+:icons: font
+:experimental:
+:sourcedir: .
+
+== Introduction
+
+The RESTEasy Jackson Provider integrates https://github.com/FasterXML/jackson[Jackson 3] with
+https://jakarta.ee/specifications/restful-ws/[Jakarta REST] applications running on
+https://resteasy.dev[RESTEasy]. It provides JSON serialization and deserialization using Jackson's high-performance
+data-binding capabilities.
+
+This provider is a standalone project with its own release cycle, separate from the main RESTEasy project. It uses
+Jackson 3 (`tools.jackson` coordinates), not Jackson 2 (`com.fasterxml.jackson`). For the older Jackson 2
+integration, see the `org.jboss.resteasy:resteasy-jackson2-provider` artifact documented in the
+https://docs.resteasy.dev[main RESTEasy documentation].
+
+Features include:
+
+* JSON serialization and deserialization with Jackson 3
+* Support for `application/json`, `application/*+json`, and `text/json` media types
+* JSON Patch (https://datatracker.ietf.org/doc/html/rfc6902[RFC 6902]) support
+* JSON Merge Patch (https://datatracker.ietf.org/doc/html/rfc7396[RFC 7396]) support
+* Polymorphic type handling with allow-list validation
+* Custom `JsonMapper` configuration via `ContextResolver`
+* RESTEasy tracing integration
+
+=== Version Information
+
+This guide is for RESTEasy Jackson Provider version *{jackson-provider-version}*.
+
+* link:apidocs/[Javadoc API Reference]
+* For the main RESTEasy documentation (Jakarta REST implementation), see https://docs.resteasy.dev[docs.resteasy.dev].
+
+include::getting-started.adoc[]
+
+include::json-patch.adoc[]
+
+include::configuration.adoc[]

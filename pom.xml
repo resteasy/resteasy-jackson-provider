@@ -13,10 +13,10 @@
     </parent>
 
     <groupId>dev.resteasy.providers</groupId>
-    <artifactId>resteasy-jackson-provider</artifactId>
+    <artifactId>resteasy-jackson-provider-parent</artifactId>
     <version>1.0.0.Alpha2-SNAPSHOT</version>
-    <packaging>jar</packaging>
-    <name>RESTEasy Jackson Provider</name>
+    <packaging>pom</packaging>
+    <name>RESTEasy Jackson Provider - Parent</name>
     <description>A Jakarta REST provider for Jackson with RESTEasy</description>
 
     <url>https://resteasy.dev</url>
@@ -45,6 +45,11 @@
         </developer>
     </developers>
 
+    <modules>
+        <module>provider</module>
+        <module>docs</module>
+    </modules>
+
     <scm>
         <connection>scm:git:git://git@github.com:resteasy/resteasy-jackson-provider.git</connection>
         <developerConnection>scm:git:git://git@github.com:resteasy/resteasy-jackson-provider.git</developerConnection>
@@ -60,17 +65,6 @@
     <properties>
         <!-- Compile to Java SE 17 -->
         <maven.compiler.release>17</maven.compiler.release>
-
-        <!-- Dependency Versions, keep in alphabetical order -->
-        <version.jakarta.ee>10.0.0</version.jakarta.ee>
-        <version.org.jboss.logging>3.6.3.Final</version.org.jboss.logging>
-        <version.org.jboss.logging.jboss-logging-tools>3.0.4.Final</version.org.jboss.logging.jboss-logging-tools>
-        <version.org.jboss.logmanager>3.2.2.Final</version.org.jboss.logmanager>
-        <version.org.jboss.resteasy>6.2.16.Final</version.org.jboss.resteasy>
-        <version.org.jboss.resteasy.extensions>2.0.2.Final</version.org.jboss.resteasy.extensions>
-        <version.org.jboss.resteasy.junit>1.0.0.Beta5</version.org.jboss.resteasy.junit>
-        <version.org.junit>6.1.2</version.org.junit>
-        <version.tools.jackson>3.1.5</version.tools.jackson>
 
         <!-- Plugin versions -->
         <version.spotless-maven-plugin>3.9.0</version.spotless-maven-plugin>
@@ -93,155 +87,8 @@
         <central.deploymentName>resteasy-jackson-provider-${project.version}</central.deploymentName>
     </properties>
 
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>jakarta.platform</groupId>
-                <artifactId>jakarta.jakartaee-bom</artifactId>
-                <version>${version.jakarta.ee}</version>
-                <scope>import</scope>
-                <type>pom</type>
-            </dependency>
-            <dependency>
-                <groupId>org.jboss.resteasy</groupId>
-                <artifactId>resteasy-bom</artifactId>
-                <version>${version.org.jboss.resteasy}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>tools.jackson</groupId>
-                <artifactId>jackson-bom</artifactId>
-                <version>${version.tools.jackson}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.junit</groupId>
-                <artifactId>junit-bom</artifactId>
-                <version>${version.org.junit}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-            <dependency>
-                <groupId>org.jboss.logging</groupId>
-                <artifactId>jboss-logging</artifactId>
-                <version>${version.org.jboss.logging}</version>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
-    <dependencies>
-        <dependency>
-            <groupId>org.jboss.resteasy</groupId>
-            <artifactId>resteasy-core-spi</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.resteasy</groupId>
-            <artifactId>resteasy-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-core</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>tools.jackson.core</groupId>
-            <artifactId>jackson-databind</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.fasterxml.jackson.core</groupId>
-            <artifactId>jackson-annotations</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>tools.jackson.jakarta.rs</groupId>
-            <artifactId>jackson-jakarta-rs-base</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>tools.jackson.jakarta.rs</groupId>
-            <artifactId>jackson-jakarta-rs-json-provider</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>tools.jackson.module</groupId>
-            <artifactId>jackson-module-jakarta-xmlbind-annotations</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.jboss.logging</groupId>
-            <artifactId>jboss-logging</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.logging</groupId>
-            <artifactId>jboss-logging-annotations</artifactId>
-            <version>${version.org.jboss.logging.jboss-logging-tools}</version>
-            <!-- This is a compile time only requirement -->
-            <scope>provided</scope>
-            <optional>true</optional>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.resteasy</groupId>
-            <artifactId>resteasy-tracing-api</artifactId>
-            <version>${version.org.jboss.resteasy.extensions}</version>
-            <optional>true</optional>
-        </dependency>
-
-        <!-- Test dependencies -->
-        <dependency>
-            <groupId>dev.resteasy.junit.extension</groupId>
-            <artifactId>resteasy-junit-extension</artifactId>
-            <version>${version.org.jboss.resteasy.junit}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.jupiter</groupId>
-            <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.logmanager</groupId>
-            <artifactId>jboss-logmanager</artifactId>
-            <version>${version.org.jboss.logmanager}</version>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.resteasy</groupId>
-            <artifactId>resteasy-client</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.jboss.resteasy</groupId>
-            <artifactId>resteasy-undertow-cdi</artifactId>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
     <build>
         <plugins>
-            <plugin>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <configuration>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>org.jboss.logging</groupId>
-                            <artifactId>jboss-logging-processor</artifactId>
-                            <version>${version.org.jboss.logging.jboss-logging-tools}</version>
-                        </path>
-                    </annotationProcessorPaths>
-                    <compilerArgs>
-                        <!-- Do not add the @Generated annotation to the generated logging source files to avoid
-                             requiring the java.compiler module dependency.
-                         -->
-                        <arg>-Aorg.jboss.logging.tools.addGeneratedAnnotation=false</arg>
-                    </compilerArgs>
-                </configuration>
-            </plugin>
-            <plugin>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <configuration>
-                    <systemPropertyVariables>
-                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
-                    </systemPropertyVariables>
-                </configuration>
-            </plugin>
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
