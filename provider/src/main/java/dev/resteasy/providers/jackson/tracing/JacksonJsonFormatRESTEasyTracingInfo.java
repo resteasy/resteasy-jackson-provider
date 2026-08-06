@@ -11,6 +11,8 @@ import jakarta.ws.rs.ext.Providers;
 import org.jboss.resteasy.tracing.api.RESTEasyTracingInfoFormat;
 import org.jboss.resteasy.tracing.api.providers.TextBasedRESTEasyTracingInfo;
 
+import dev.resteasy.providers.jackson._private.JacksonLogger;
+
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -29,7 +31,7 @@ public class JacksonJsonFormatRESTEasyTracingInfo extends TextBasedRESTEasyTraci
         try {
             return new String[] { mapper.writeValueAsString(pop()) };
         } catch (JacksonException e) {
-            throw new RuntimeException(e);
+            throw JacksonLogger.LOGGER.failedToSerializeTracingMessage(e);
         }
     }
 
