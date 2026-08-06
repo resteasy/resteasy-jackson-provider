@@ -43,9 +43,6 @@ The allow-list is configured via system properties or RESTEasy configuration pro
 | Comma-separated prefixes for allowed subtypes. Use `*` to allow any subtype.
 |===
 
-For backwards compatibility, the `.prefix` suffix is also accepted on these property names (e.g.,
-`dev.resteasy.jackson.deserialization.allowlist.allowIfBaseType.prefix`).
-
 Example configuration allowing types in the `com.example` package:
 
 [source]

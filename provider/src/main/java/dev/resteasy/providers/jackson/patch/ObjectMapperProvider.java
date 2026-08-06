@@ -16,6 +16,9 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
 
 /**
+ * Base class for patch readers that provides {@link JsonMapper} lookup via a {@link jakarta.ws.rs.ext.ContextResolver
+ * ContextResolver}. Applies {@link dev.resteasy.providers.jackson.AllowListPolymorphicTypeValidatorBuilder
+ * AllowListPolymorphicTypeValidatorBuilder} when the mapper uses the default validator.
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */

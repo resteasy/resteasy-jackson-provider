@@ -13,9 +13,11 @@ import dev.resteasy.providers.jackson._private.JacksonLogger;
 import tools.jackson.core.JacksonException;
 
 /**
+ * Maps {@link JacksonException} to a {@code 400 Bad Request} response. The exception details are logged but not
+ * exposed in the response body.
+ *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */
-// TODO (jrp) validate this works the same
 public class JsonProcessingExceptionMapper implements ExceptionMapper<JacksonException> {
     @Override
     public Response toResponse(final JacksonException exception) {

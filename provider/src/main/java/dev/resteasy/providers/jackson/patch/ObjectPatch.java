@@ -7,7 +7,7 @@ package dev.resteasy.providers.jackson.patch;
 
 /**
  * Format-agnostic interface for applying patches to objects. Implementations handle specific patch formats like
- * JSON Patch (RFC 6902) and JSON Merge Patch (RFC 7386).
+ * JSON Patch (RFC 6902) and JSON Merge Patch (RFC 7396).
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */

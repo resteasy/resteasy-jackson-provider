@@ -5,8 +5,6 @@
 
 package dev.resteasy.providers.jackson.patch;
 
-import static dev.resteasy.providers.jackson.ResteasyMediaTypes.APPLICATION_MERGE_PATCH_JSON;
-
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.WebTarget;
 import jakarta.ws.rs.core.Response;
@@ -49,7 +47,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -71,7 +69,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -96,7 +94,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -118,7 +116,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -141,7 +139,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -163,7 +161,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -180,7 +178,7 @@ class JsonMergePatchTest {
         final String mergePatchJson = "{}";
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -200,7 +198,7 @@ class JsonMergePatchTest {
         final String mergePatchJson = "\"string value\"";
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             // This would replace the entire customer with a string, which
@@ -223,7 +221,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -251,7 +249,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             // Type mismatches should fail during deserialization
@@ -272,7 +270,7 @@ class JsonMergePatchTest {
                 """;
 
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.NOT_FOUND.getStatusCode(), response.getStatus());
@@ -292,7 +290,7 @@ class JsonMergePatchTest {
 
         // First application
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());
@@ -302,7 +300,7 @@ class JsonMergePatchTest {
 
         // Second application - should produce same result
         try (Response response = target.request()
-                .build("PATCH", Entity.entity(mergePatchJson, APPLICATION_MERGE_PATCH_JSON))
+                .build("PATCH", Entity.entity(mergePatchJson, "application/merge-patch+json"))
                 .invoke()) {
 
             Assertions.assertEquals(Response.Status.OK.getStatusCode(), response.getStatus());

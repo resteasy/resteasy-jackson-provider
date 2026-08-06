@@ -12,9 +12,22 @@ import org.jboss.resteasy.spi.config.ConfigurationFactory;
 
 import tools.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 
+/**
+ * A {@link BasicPolymorphicTypeValidator.Builder} that populates allowed base types and subtypes from configuration
+ * properties. Applied as the default validator when no custom {@link tools.jackson.databind.jsontype.PolymorphicTypeValidator
+ * PolymorphicTypeValidator} is configured.
+ * <p>
+ * Supported properties (comma-separated, {@code *} for wildcard):
+ * </p>
+ * <ul>
+ * <li>{@code dev.resteasy.jackson.deserialization.allowlist.allowIfBaseType}</li>
+ * <li>{@code dev.resteasy.jackson.deserialization.allowlist.allowIfSubType}</li>
+ * </ul>
+ *
+ * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
+ */
 public class AllowListPolymorphicTypeValidatorBuilder extends BasicPolymorphicTypeValidator.Builder {
-    // The documentation does not indicate the ".prefix" part of the property, see RESTEASY-3174. For this reason we're
-    // going to allow both the .prefix and non-".prefix" versions.
+
     private static final String BASE_TYPE_PROP = "dev.resteasy.jackson.deserialization.allowlist.allowIfBaseType";
     private static final String SUB_TYPE_PROP = "dev.resteasy.jackson.deserialization.allowlist.allowIfSubType";
 
@@ -45,7 +58,6 @@ public class AllowListPolymorphicTypeValidatorBuilder extends BasicPolymorphicTy
     private static String getProperty(final String name) {
         final Configuration config = ConfigurationFactory.getInstance().getConfiguration();
         return config.getOptionalValue(name, String.class)
-                .or(() -> config.getOptionalValue(name + ".prefix", String.class))
                 .orElse(null);
     }
 }

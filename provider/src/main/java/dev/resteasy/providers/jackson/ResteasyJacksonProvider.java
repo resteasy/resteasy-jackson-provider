@@ -20,7 +20,6 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
 
-import org.jboss.resteasy.core.interception.jaxrs.DecoratorMatcher;
 import org.jboss.resteasy.core.messagebody.AsyncBufferedMessageBodyWriter;
 import org.jboss.resteasy.plugins.providers.ProviderHelper;
 import org.jboss.resteasy.spi.AsyncOutputStream;
@@ -36,7 +35,6 @@ import tools.jackson.core.StreamWriteFeature;
 import tools.jackson.databind.JavaType;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
-import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
 import tools.jackson.jakarta.rs.base.util.ClassKey;
@@ -46,7 +44,9 @@ import tools.jackson.jakarta.rs.json.JacksonJsonProvider;
 import tools.jackson.jakarta.rs.json.JsonEndpointConfig;
 
 /**
- * Only different from Jackson one is *+json in @Produces/@Consumes
+ * A Jakarta REST provider for JSON serialization and deserialization using Jackson. Extends Jackson's
+ * {@link JacksonJsonProvider} with additional media type support ({@code application/*+json}, {@code text/json}),
+ * polymorphic type validation via {@link AllowListPolymorphicTypeValidatorBuilder}, and asynchronous write support.
  *
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
@@ -55,107 +55,19 @@ import tools.jackson.jakarta.rs.json.JsonEndpointConfig;
 @Produces({ "application/json", "application/*+json", "text/json" })
 public class ResteasyJacksonProvider extends JacksonJsonProvider implements AsyncBufferedMessageBodyWriter<Object> {
 
-    // TODO (jrp) no need for these to be exposed
-    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> _readers = new ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig>();
-    private final ConcurrentHashMap<ClassAnnotationKey, Boolean> decorators = new ConcurrentHashMap<ClassAnnotationKey, Boolean>();
+    private static final byte[] EMPTY = new byte[0];
 
-    private final DecoratorMatcher decoratorMatcher = new DecoratorMatcher();
-
-    @Override
-    public boolean isReadable(Class<?> aClass, Type type, Annotation[] annotations, MediaType mediaType) {
-        return super.isReadable(aClass, type, annotations, mediaType);
-    }
-
-    @Override
-    public boolean isWriteable(Class<?> aClass, Type type, Annotation[] annotations, MediaType mediaType) {
-        return super.isWriteable(aClass, type, annotations, mediaType);
-    }
-
-    // Currently we need to override readFrom and writeTo because Jackson 2.2.1 does not cache correctly
-    // It does not allow to have a ContextResolver that chooses different mappers per Java type.
-
-    private static class ClassAnnotationKey {
-        private AnnotationArrayKey annotations;
-        private ClassKey classKey;
-        private int hash;
-
-        private ClassAnnotationKey(final Class<?> clazz, final Annotation[] annotations) {
-            this.annotations = new AnnotationArrayKey(annotations);
-            this.classKey = new ClassKey(clazz);
-            hash = this.annotations.hashCode();
-            hash = 31 * hash + classKey.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
-
-            ClassAnnotationKey that = (ClassAnnotationKey) o;
-
-            if (!annotations.equals(that.annotations))
-                return false;
-            if (!classKey.equals(that.classKey))
-                return false;
-
-            return true;
-        }
-
-        @Override
-        public int hashCode() {
-            return hash;
-        }
-    }
-
-    // Alternative to Jackson's AnnotationBundleKey that uses object equality
-    // instead of referential equality (==) due to how parameter annotations are proxied and not cached.
-    private static class AnnotationArrayKey {
-        private static final Annotation[] NO_ANNOTATIONS = new Annotation[0];
-
-        private final Annotation[] annotations;
-        private final int hash;
-
-        private AnnotationArrayKey(final Annotation[] annotations) {
-            if (annotations == null || annotations.length == 0) {
-                this.annotations = NO_ANNOTATIONS;
-            } else {
-                this.annotations = annotations;
-            }
-            this.hash = calcHash(this.annotations);
-        }
-
-        private static int calcHash(Annotation[] annotations) {
-            int result = annotations.length;
-            result = 31 * result + Arrays.hashCode(annotations);
-            return result;
-        }
-
-        @Override
-        public int hashCode() {
-            return hash;
-        }
-
-        @Override
-        public boolean equals(Object object) {
-            if (this == object)
-                return true;
-            if (object == null || getClass() != object.getClass())
-                return false;
-            AnnotationArrayKey that = (AnnotationArrayKey) object;
-            return hash == that.hash && java.util.Arrays.equals(annotations, that.annotations);
-        }
-    }
+    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> readers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> writers = new ConcurrentHashMap<>();
 
     @Override
     public Object readFrom(Class<Object> type, final Type genericType, Annotation[] annotations, MediaType mediaType,
             MultivaluedMap<String, String> httpHeaders, InputStream entityStream)
             throws JacksonException {
         JacksonLogger.LOGGER.debugf("Provider : %s,  Method : readFrom", getClass().getName());
-        ClassAnnotationKey key = new ClassAnnotationKey(type, annotations);
+        ClassAnnotationKey key = new ClassAnnotationKey(new AnnotationArrayKey(annotations), new ClassKey(type));
         JsonEndpointConfig endpoint;
-        endpoint = _readers.get(key);
+        endpoint = readers.get(key);
         // not yet resolved (or not cached any more)? Resolve!
         if (endpoint == null) {
             JsonMapper mapper = locateMapper(type, mediaType);
@@ -165,7 +77,7 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
                         .build();
             }
             endpoint = _configForReading(mapper, annotations, null);
-            _readers.put(key, endpoint);
+            readers.put(key, endpoint);
         }
         final ObjectReader reader = endpoint.getReader();
         try (JsonParser jp = _createParser(reader, entityStream)) {
@@ -176,65 +88,12 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
                 return null;
             }
 
-            // [Issue#1]: allow 'binding' to JsonParser
             if (((Class<?>) type) == JsonParser.class) {
                 return jp;
             }
-            return reader.forType(reader.getTypeFactory().constructType(genericType)).readValue(jp);
+            return reader.forType(reader.typeFactory().constructType(genericType)).readValue(jp);
         }
     }
-
-    // TODO (jrp) no need to expose this
-    protected final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> _writers = new ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig>();
-
-    private static final class LazyByteArrayOutputStream extends OutputStream {
-
-        private byte[] buf;
-        private int count;
-
-        private void ensureCapacity(int minCapacity) {
-            if (minCapacity < 0) {
-                throw new OutOfMemoryError();
-            }
-            if (buf == null) {
-                buf = new byte[minCapacity];
-                return;
-            }
-            int oldCapacity = buf.length;
-            int minGrowth = minCapacity - oldCapacity;
-            if (minGrowth > 0) {
-                grow(minGrowth, oldCapacity);
-            }
-        }
-
-        private void grow(int minGrowth, int oldCapacity) {
-            int newCapacity = oldCapacity + Math.max((oldCapacity >> 1), minGrowth);
-            if (newCapacity < 0) {
-                // if we cannot grow as much as we want, let's just grow to what we need
-                newCapacity = oldCapacity + minGrowth;
-                if (newCapacity < 0) {
-                    throw new OutOfMemoryError();
-                }
-            }
-            buf = Arrays.copyOf(buf, newCapacity);
-        }
-
-        @Override
-        public void write(int b) {
-            ensureCapacity(count + 1);
-            buf[count] = (byte) b;
-            count++;
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            ensureCapacity(count + len);
-            System.arraycopy(b, off, buf, count, len);
-            count += len;
-        }
-    }
-
-    private static final byte[] EMPTY = new byte[0];
 
     @Override
     public CompletionStage<Void> asyncWriteTo(Object t, Class<?> type, Type genericType, Annotation[] annotations,
@@ -265,9 +124,9 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
                 // and causes chunked encoding to happen.
             }
         };
-        ClassAnnotationKey key = new ClassAnnotationKey(type, annotations);
+        ClassAnnotationKey key = new ClassAnnotationKey(new AnnotationArrayKey(annotations), new ClassKey(type));
         JsonEndpointConfig endpoint;
-        endpoint = _writers.get(key);
+        endpoint = writers.get(key);
 
         // not yet resolved (or not cached any more)? Resolve!
         if (endpoint == null) {
@@ -280,54 +139,29 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
             endpoint = _configForWriting(mapper, annotations, null);
 
             // and cache for future reuse
-            _writers.put(key, endpoint);
+            writers.put(key, endpoint);
         }
 
         ObjectWriter writer = endpoint.getWriter()
                 .withFeatures(StreamWriteFeature.AUTO_CLOSE_TARGET);
 
-        /*
-         * 27-Feb-2009, tatu: Where can we find desired encoding? Within
-         * HTTP headers?
-         */
         JsonEncoding enc = findEncoding(mediaType, httpHeaders);
 
         try (JsonGenerator jg = writer.createGenerator(entityStream, enc)) {
-            // Want indentation?
-            // TODO (jrp) verify if we also need to check the mapper here
-            if (writer.isEnabled(SerializationFeature.INDENT_OUTPUT)) {
-                //jg.useDefaultPrettyPrinter();
-            }
-            // 04-Mar-2010, tatu: How about type we were given? (if any)
             JavaType rootType = null;
 
             if (genericType != null && value != null) {
-                /*
-                 * 10-Jan-2011, tatu: as per [JACKSON-456], it's not safe to just force root
-                 * type since it prevents polymorphic type serialization. Since we really
-                 * just need this for generics, let's only use generic type if it's truly
-                 * generic.
-                 */
-                if (genericType.getClass() != Class.class) { // generic types are other impls of 'java.lang.reflect.Type'
-                    /*
-                     * This is still not exactly right; should root type be further
-                     * specialized with 'value.getClass()'? Let's see how well this works before
-                     * trying to come up with more complete solution.
-                     */
-                    rootType = writer.getTypeFactory().constructType(genericType);
-                    /*
-                     * 26-Feb-2011, tatu: To help with [JACKSON-518], we better recognize cases where
-                     * type degenerates back into "Object.class" (as is the case with plain TypeVariable,
-                     * for example), and not use that.
-                     */
+                // Only use generic type for actual generic types (ParameterizedType, etc.),
+                // not plain Class, to avoid breaking polymorphic type serialization.
+                if (genericType.getClass() != Class.class) {
+                    rootType = writer.typeFactory().constructType(genericType);
+                    // A plain TypeVariable resolves to Object.class — ignore it.
                     if (rootType.getRawClass() == Object.class) {
                         rootType = null;
                     }
                 }
             }
 
-            // Most of the configuration now handled through EndpointConfig, ObjectWriter
-            // but we may need to force root type:
             if (rootType != null) {
                 writer = writer.forType(rootType);
             }
@@ -338,30 +172,99 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
                 mod = ResteasyObjectWriterInjector.get(tccl);
             }
             if (mod != null) {
-                // TODO (jrp) previously we added the JsonGenerator as the last argument here and we need to figure out
-                // TODO (jrp) why that was and if we still need to do that.
                 writer = mod.modify(endpoint, httpHeaders, value, writer);
             }
 
-            // [RESTEASY-1317] Support Jackson in Atom links
-            Boolean hasDecorator = decorators.get(key);
-            if (hasDecorator == null) {
-                if (decoratorMatcher.hasDecorator(DecoratedEntityContainer.class, annotations)) {
-                    decoratorMatcher
-                            .decorate(DecoratedEntityContainer.class, new DecoratedEntityContainer(value), type, annotations,
-                                    mediaType);
-                    decorators.put(key, Boolean.TRUE);
-                } else {
-                    decorators.put(key, Boolean.FALSE);
-                }
+            writer.writeValue(jg, value);
+        }
+    }
+
+    private record ClassAnnotationKey(AnnotationArrayKey annotations, ClassKey classKey) {
+    }
+
+    // Alternative to Jackson's AnnotationBundleKey that uses object equality
+    // instead of referential equality (==) due to how parameter annotations are proxied and not cached.
+    private static class AnnotationArrayKey {
+        private static final Annotation[] NO_ANNOTATIONS = new Annotation[0];
+
+        private final Annotation[] annotations;
+        private final int hash;
+
+        private AnnotationArrayKey(final Annotation[] annotations) {
+            if (annotations == null || annotations.length == 0) {
+                this.annotations = NO_ANNOTATIONS;
             } else {
-                if (hasDecorator) {
-                    decoratorMatcher
-                            .decorate(DecoratedEntityContainer.class, new DecoratedEntityContainer(value), type, annotations,
-                                    mediaType);
+                this.annotations = annotations;
+            }
+            this.hash = calcHash(this.annotations);
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object object) {
+            if (this == object)
+                return true;
+            if (object == null || getClass() != object.getClass())
+                return false;
+            AnnotationArrayKey that = (AnnotationArrayKey) object;
+            return hash == that.hash && Arrays.equals(annotations, that.annotations);
+        }
+
+        private static int calcHash(Annotation[] annotations) {
+            int result = annotations.length;
+            result = 31 * result + Arrays.hashCode(annotations);
+            return result;
+        }
+    }
+
+    private static final class LazyByteArrayOutputStream extends OutputStream {
+
+        private byte[] buf;
+        private int count;
+
+        @Override
+        public void write(int b) {
+            ensureCapacity(count + 1);
+            buf[count] = (byte) b;
+            count++;
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            ensureCapacity(count + len);
+            System.arraycopy(b, off, buf, count, len);
+            count += len;
+        }
+
+        private void ensureCapacity(int minCapacity) {
+            if (minCapacity < 0) {
+                throw new OutOfMemoryError();
+            }
+            if (buf == null) {
+                buf = new byte[minCapacity];
+                return;
+            }
+            int oldCapacity = buf.length;
+            int minGrowth = minCapacity - oldCapacity;
+            if (minGrowth > 0) {
+                grow(minGrowth, oldCapacity);
+            }
+        }
+
+        private void grow(int minGrowth, int oldCapacity) {
+            int newCapacity = oldCapacity + Math.max((oldCapacity >> 1), minGrowth);
+            if (newCapacity < 0) {
+                // if we cannot grow as much as we want, let's just grow to what we need
+                newCapacity = oldCapacity + minGrowth;
+                if (newCapacity < 0) {
+                    throw new OutOfMemoryError();
                 }
             }
-            writer.writeValue(jg, value);
+            buf = Arrays.copyOf(buf, newCapacity);
         }
     }
 }
