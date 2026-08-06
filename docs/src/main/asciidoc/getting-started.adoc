@@ -1,0 +1,93 @@
+[[getting-started]]
+
+== Getting Started
+
+=== Maven Dependencies
+
+Add the RESTEasy Jackson Provider to the project:
+
+[source,xml,subs="attributes+"]
+----
+<dependency>
+    <groupId>dev.resteasy.providers</groupId>
+    <artifactId>resteasy-jackson-provider</artifactId>
+    <version>{jackson-provider-version}</version>
+</dependency>
+----
+
+The provider auto-registers via the `jakarta.ws.rs.core.Feature` service loader mechanism. No additional
+configuration is needed -- once the dependency is on the classpath, JSON support is available.
+
+=== Basic JSON Endpoints
+
+The provider automatically handles serialization and deserialization of Java objects to and from JSON.
+
+Reading JSON:
+
+[source,java]
+----
+@Path("/customers")
+public class CustomerResource {
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response createCustomer(Customer customer) {
+        // customer is deserialized from the JSON request body
+        save(customer);
+        return Response.status(Response.Status.CREATED).entity(customer).build();
+    }
+
+    @GET
+    @Path("/{id}")
+    @Produces(MediaType.APPLICATION_JSON)
+    public Customer getCustomer(@PathParam("id") String id) {
+        // the returned object is serialized to JSON
+        return findCustomer(id);
+    }
+}
+----
+
+=== Supported Media Types
+
+The provider handles the following media types:
+
+* `application/json`
+* `application/*+json` (vendor-specific JSON media types)
+* `text/json`
+
+The `application/*+json` wildcard allows the use of custom JSON-based media types:
+
+[source,java]
+----
+@GET
+@Produces("application/vnd.customer+json")
+public Customer getCustomer() {
+    return findCustomer();
+}
+----
+
+=== Migration from resteasy-jackson2-provider
+
+This provider uses Jackson 3, which has different Maven coordinates and package names from Jackson 2.
+
+[cols="1,1", options="header"]
+|===
+| Jackson 2 (`resteasy-jackson2-provider`)
+| Jackson 3 (`resteasy-jackson-provider`)
+
+| `com.fasterxml.jackson` packages
+| `tools.jackson` packages
+
+| `com.fasterxml.jackson.databind.ObjectMapper`
+| `tools.jackson.databind.json.JsonMapper`
+
+| Group ID: `org.jboss.resteasy`
+| Group ID: `dev.resteasy.providers`
+
+| `com.fasterxml.jackson.core.JsonProcessingException`
+| `tools.jackson.core.JacksonException`
+
+| `resteasy.jackson.deserialization.whitelist.*` properties
+| `dev.resteasy.jackson.deserialization.allowlist.*` properties
+|===

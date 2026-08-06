@@ -3,6 +3,8 @@
 
 A Jakarta REST provider for Jackson integration with RESTEasy. This provider supports Jackson 3.x and includes support for JSON Patch (RFC 6902) and JSON Merge Patch (RFC 7396).
 
+Full documentation is available at https://docs.resteasy.dev/resteasy-jackson-provider/.
+
 == Overview
 
 The RESTEasy Jackson Provider offers Jackson integration for Jakarta REST applications targeting RESTEasy, including:
@@ -79,17 +81,20 @@ public class MyResource {
 
 === Pretty-Printed Output
 
-// TODO (jrp) remove this or show the Jackson way of doing it. There is no need for this annotation
-Use the `@Formatted` annotation to enable pretty-printing for specific endpoints:
+Enable pretty-printing by configuring the `JsonMapper` with `SerializationFeature.INDENT_OUTPUT` via a
+`ContextResolver<JsonMapper>`:
 
 [source,java]
 ----
-@GET
-@Path("/formatted")
-@Produces(MediaType.APPLICATION_JSON)
-@Formatted
-public MyData getFormattedData() {
-    return new MyData("example", 42);
+@Provider
+public class PrettyPrintMapperProvider implements ContextResolver<JsonMapper> {
+
+    @Override
+    public JsonMapper getContext(final Class<?> type) {
+        return JsonMapper.builder()
+                .enable(SerializationFeature.INDENT_OUTPUT)
+                .build();
+    }
 }
 ----
 
@@ -103,9 +108,9 @@ JSON Patch (RFC 6902) allows you to express a sequence of operations to apply to
 @Path("/customer/{id}")
 @Consumes("application/json-patch+json")
 @Produces(MediaType.APPLICATION_JSON)
-public Customer patchCustomer(@PathParam("id") String id, JsonObjectPatch patch) {
+public Customer patchCustomer(@PathParam("id") String id, ObjectPatch patch) {
     Customer customer = findCustomer(id);
-    return patch.apply(customer, Customer.class);
+    return patch.apply(customer);
 }
 ----
 
@@ -129,9 +134,9 @@ JSON Merge Patch (RFC 7396) provides a simpler patching mechanism:
 @Path("/customer/{id}")
 @Consumes("application/merge-patch+json")
 @Produces(MediaType.APPLICATION_JSON)
-public Customer mergePatchCustomer(@PathParam("id") String id, JsonMergeObjectPatch patch) {
+public Customer mergePatchCustomer(@PathParam("id") String id, ObjectPatch patch) {
     Customer customer = findCustomer(id);
-    return patch.apply(customer, Customer.class);
+    return patch.apply(customer);
 }
 ----
 
@@ -146,18 +151,19 @@ Example JSON Merge Patch request:
 
 == Configuration
 
-The provider can be configured using the `JacksonOptions` class to customize Jackson's `ObjectMapper`:
+The provider can be configured by registering a `ContextResolver<JsonMapper>` to customize Jackson's `JsonMapper`:
 
 [source,java]
 ----
-@ApplicationScoped
-public class JacksonConfiguration implements JacksonOptions {
+@Provider
+public class CustomJsonMapperProvider implements ContextResolver<JsonMapper> {
 
     @Override
-    public ObjectMapper configure(ObjectMapper mapper) {
-        return mapper
-            .configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false)
-            .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
+    public JsonMapper getContext(final Class<?> type) {
+        return JsonMapper.builder()
+                .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS)
+                .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                .build();
     }
 }
 ----
