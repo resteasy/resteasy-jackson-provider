@@ -15,18 +15,15 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.ext.MessageBodyReader;
 
-import dev.resteasy.providers.jackson.ResteasyMediaTypes;
-
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * MessageBodyReader for JSON Merge Patch (RFC 7396).
- * Handles {@code application/merge-patch+json} media type.
+ * MessageBodyReader for JSON Merge Patch (RFC 7396). Handles {@code application/merge-patch+json} media type.
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */
-@Consumes(ResteasyMediaTypes.APPLICATION_MERGE_PATCH_JSON)
+@Consumes("application/merge-patch+json")
 public class JsonMergePatchReader extends ObjectMapperProvider implements MessageBodyReader<ObjectPatch> {
 
     @Override

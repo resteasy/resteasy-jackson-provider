@@ -12,6 +12,8 @@ import dev.resteasy.providers.jackson.patch.JsonMergePatchReader;
 import dev.resteasy.providers.jackson.patch.JsonPatchReader;
 
 /**
+ * A Jakarta REST {@link Feature} that registers the Jackson provider, exception mapper, and JSON Patch readers.
+ * Discovered automatically via {@code META-INF/services/jakarta.ws.rs.core.Feature}.
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */

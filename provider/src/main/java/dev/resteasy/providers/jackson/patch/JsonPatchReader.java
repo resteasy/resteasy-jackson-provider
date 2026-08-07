@@ -15,6 +15,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.ext.MessageBodyReader;
 
+import dev.resteasy.providers.jackson._private.JacksonLogger;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -44,6 +46,6 @@ public class JsonPatchReader extends ObjectMapperProvider implements MessageBody
         if (node.isArray()) {
             return new JacksonObjectPatch(mapper, new JacksonJsonPatch((ArrayNode) node));
         }
-        throw new WebApplicationException("JSON patch data is not a valid array");
+        throw JacksonLogger.LOGGER.invalidPatchData();
     }
 }

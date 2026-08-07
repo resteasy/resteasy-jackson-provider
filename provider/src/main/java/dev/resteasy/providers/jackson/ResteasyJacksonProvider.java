@@ -17,35 +17,46 @@ import java.util.concurrent.ConcurrentHashMap;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
+import jakarta.ws.rs.core.NoContentException;
+import jakarta.ws.rs.ext.ContextResolver;
+import jakarta.ws.rs.ext.Providers;
 
-import org.jboss.resteasy.core.interception.jaxrs.DecoratorMatcher;
 import org.jboss.resteasy.core.messagebody.AsyncBufferedMessageBodyWriter;
 import org.jboss.resteasy.plugins.providers.ProviderHelper;
 import org.jboss.resteasy.spi.AsyncOutputStream;
 import org.jboss.resteasy.util.DelegatingOutputStream;
 
 import dev.resteasy.providers.jackson._private.JacksonLogger;
+import dev.resteasy.providers.jackson.api.JacksonProviderConfig;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonEncoding;
 import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonParser;
-import tools.jackson.core.StreamWriteFeature;
+import tools.jackson.core.JsonToken;
 import tools.jackson.databind.JavaType;
+import tools.jackson.databind.MappingIterator;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
-import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
+import tools.jackson.databind.jsontype.DefaultBaseTypeLimitingValidator;
+import tools.jackson.databind.type.TypeFactory;
 import tools.jackson.jakarta.rs.base.util.ClassKey;
+import tools.jackson.jakarta.rs.cfg.JakartaRSFeature;
+import tools.jackson.jakarta.rs.cfg.ObjectReaderInjector;
+import tools.jackson.jakarta.rs.cfg.ObjectReaderModifier;
 import tools.jackson.jakarta.rs.cfg.ObjectWriterInjector;
 import tools.jackson.jakarta.rs.cfg.ObjectWriterModifier;
 import tools.jackson.jakarta.rs.json.JacksonJsonProvider;
 import tools.jackson.jakarta.rs.json.JsonEndpointConfig;
 
 /**
- * Only different from Jackson one is *+json in @Produces/@Consumes
+ * A Jakarta REST provider for JSON serialization and deserialization using Jackson. Extends Jackson's
+ * {@link JacksonJsonProvider} with additional media type support ({@code application/*+json}, {@code text/json}),
+ * polymorphic type validation via {@link AllowListPolymorphicTypeValidatorBuilder}, and asynchronous write support.
  *
  * @author <a href="mailto:bill@burkecentral.com">Bill Burke</a>
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
@@ -54,58 +65,195 @@ import tools.jackson.jakarta.rs.json.JsonEndpointConfig;
 @Produces({ "application/json", "application/*+json", "text/json" })
 public class ResteasyJacksonProvider extends JacksonJsonProvider implements AsyncBufferedMessageBodyWriter<Object> {
 
-    // TODO (jrp) no need for these to be exposed
-    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> _readers = new ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig>();
-    private final ConcurrentHashMap<ClassAnnotationKey, Boolean> decorators = new ConcurrentHashMap<ClassAnnotationKey, Boolean>();
+    private static final byte[] EMPTY = new byte[0];
 
-    private final DecoratorMatcher decoratorMatcher = new DecoratorMatcher();
+    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> readers = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> writers = new ConcurrentHashMap<>();
+
+    @Context
+    private Providers providers;
+
+    private volatile boolean needsFeatureInit = true;
 
     @Override
-    public boolean isReadable(Class<?> aClass, Type type, Annotation[] annotations, MediaType mediaType) {
-        return super.isReadable(aClass, type, annotations, mediaType);
+    public Object readFrom(final Class<Object> type, final Type genericType, final Annotation[] annotations,
+            final MediaType mediaType, final MultivaluedMap<String, String> httpHeaders, final InputStream entityStream)
+            throws JacksonException, NoContentException {
+        initializeFeatures();
+        JacksonLogger.LOGGER.debugf("Provider : %s,  Method : readFrom", getClass().getName());
+        final ClassAnnotationKey key = new ClassAnnotationKey(new AnnotationArrayKey(annotations), new ClassKey(type));
+        JsonEndpointConfig endpoint = readers.get(key);
+        // not yet resolved (or not cached any more)? Resolve!
+        if (endpoint == null) {
+            JsonMapper mapper = locateMapper(type, mediaType);
+            if (mapper.deserializationConfig().getPolymorphicTypeValidator() instanceof DefaultBaseTypeLimitingValidator) {
+                mapper = mapper.rebuild()
+                        .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
+                        .build();
+            }
+            endpoint = _configForReading(mapper, annotations, _defaultReadView);
+            readers.put(key, endpoint);
+        }
+        ObjectReader reader = endpoint.getReader();
+        final JsonParser p = _createParser(reader, entityStream);
+
+        // If null is returned, considered to be empty stream
+        if (p == null || p.nextToken() == null) {
+            if (JakartaRSFeature.ALLOW_EMPTY_INPUT.enabledIn(_jakartaRSFeatures)) {
+                return null;
+            }
+            throw _createNoContentException();
+        }
+        if ((Class<?>) type == JsonParser.class) {
+            return p;
+        }
+        final TypeFactory tf = reader.typeFactory();
+        final JavaType resolvedType = tf.constructType(genericType);
+
+        final boolean multiValued = ((Class<?>) type == MappingIterator.class);
+
+        if (multiValued) {
+            final JavaType[] contents = tf.findTypeParameters(resolvedType, MappingIterator.class);
+            final JavaType valueType = (contents == null || contents.length == 0) ? tf.constructType(Object.class)
+                    : contents[0];
+            reader = reader.forType(valueType);
+        } else {
+            reader = reader.forType(resolvedType);
+        }
+
+        // Allow modification by filter-injectable thing
+        final ObjectReaderModifier mod = ObjectReaderInjector.getAndClear();
+        if (mod != null) {
+            reader = mod.modify(endpoint, httpHeaders, resolvedType, reader, p);
+        }
+
+        if (multiValued) {
+            // Advance past START_ARRAY so MappingIterator sees the first element token.
+            // readValues(JsonParser) uses managedParser=false, which does not auto-skip it.
+            if (p.currentToken() == JsonToken.START_ARRAY) {
+                p.nextToken();
+            }
+            return reader.readValues(p);
+        }
+        try {
+            return reader.readValue(p);
+        } finally {
+            // Close the parser to return internal buffers to Jackson's recycler pool.
+            // AUTO_CLOSE_SOURCE is disabled, so this won't close the container-managed InputStream.
+            p.close();
+        }
     }
 
     @Override
-    public boolean isWriteable(Class<?> aClass, Type type, Annotation[] annotations, MediaType mediaType) {
-        return super.isWriteable(aClass, type, annotations, mediaType);
+    public CompletionStage<Void> asyncWriteTo(final Object t, final Class<?> type, final Type genericType,
+            final Annotation[] annotations, final MediaType mediaType, final MultivaluedMap<String, Object> httpHeaders,
+            final AsyncOutputStream entityStream) {
+        initializeFeatures();
+        final LazyByteArrayOutputStream bos = new LazyByteArrayOutputStream();
+        try {
+            writeTo(t, type, genericType, annotations, mediaType, httpHeaders, bos);
+            byte[] array = bos.buf;
+            if (array == null) {
+                array = EMPTY;
+            }
+            bos.buf = null;
+            return entityStream.asyncWrite(array, 0, bos.count);
+        } catch (WebApplicationException | JacksonException e) {
+            return ProviderHelper.completedException(e);
+        }
     }
 
-    // Currently we need to override readFrom and writeTo because Jackson 2.2.1 does not cache correctly
-    // It does not allow to have a ContextResolver that chooses different mappers per Java type.
+    @Override
+    public void writeTo(Object value, final Class<?> type, final Type genericType, final Annotation[] annotations,
+            final MediaType mediaType, final MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream)
+            throws JacksonException {
+        initializeFeatures();
+        JacksonLogger.LOGGER.debugf("Provider : %s,  Method : writeTo", getClass().getName());
+        entityStream = new DelegatingOutputStream(entityStream) {
+            @Override
+            public void flush() throws IOException {
+                // don't flush as this is a performance hit on Undertow.
+                // and causes chunked encoding to happen.
+            }
+        };
+        final ClassAnnotationKey key = new ClassAnnotationKey(new AnnotationArrayKey(annotations), new ClassKey(type));
+        JsonEndpointConfig endpoint = writers.get(key);
 
-    private static class ClassAnnotationKey {
-        private AnnotationArrayKey annotations;
-        private ClassKey classKey;
-        private int hash;
+        // not yet resolved (or not cached any more)? Resolve!
+        if (endpoint == null) {
+            JsonMapper mapper = locateMapper(type, mediaType);
+            if (mapper.serializationConfig().getPolymorphicTypeValidator() instanceof DefaultBaseTypeLimitingValidator) {
+                mapper = mapper.rebuild()
+                        .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
+                        .build();
+            }
+            endpoint = _configForWriting(mapper, annotations, _defaultWriteView);
 
-        private ClassAnnotationKey(final Class<?> clazz, final Annotation[] annotations) {
-            this.annotations = new AnnotationArrayKey(annotations);
-            this.classKey = new ClassKey(clazz);
-            hash = this.annotations.hashCode();
-            hash = 31 * hash + classKey.hashCode();
+            // and cache for future reuse
+            writers.put(key, endpoint);
         }
 
-        @Override
-        public boolean equals(Object o) {
-            if (this == o)
-                return true;
-            if (o == null || getClass() != o.getClass())
-                return false;
+        // Any headers we should write?
+        _modifyHeaders(value, type, genericType, annotations, httpHeaders, endpoint);
 
-            ClassAnnotationKey that = (ClassAnnotationKey) o;
+        ObjectWriter writer = endpoint.getWriter();
 
-            if (!annotations.equals(that.annotations))
-                return false;
-            if (!classKey.equals(that.classKey))
-                return false;
+        final JsonEncoding enc = findEncoding(mediaType, httpHeaders);
+        JavaType rootType = null;
 
-            return true;
+        if ((genericType != null) && (value != null)) {
+            // Only use generic type for actual generic types (ParameterizedType, etc.),
+            // not plain Class, to avoid breaking polymorphic type serialization.
+            if (!(genericType instanceof Class<?>)) {
+                final TypeFactory typeFactory = writer.typeFactory();
+                final JavaType baseType = typeFactory.constructType(genericType);
+                rootType = typeFactory.constructSpecializedType(baseType, type);
+                // A plain TypeVariable resolves to Object.class — ignore it.
+                if (rootType.getRawClass() == Object.class) {
+                    rootType = null;
+                }
+            }
         }
 
-        @Override
-        public int hashCode() {
-            return hash;
+        if (rootType != null) {
+            writer = writer.forType(rootType);
         }
+        value = endpoint.modifyBeforeWrite(value);
+        ObjectWriterModifier mod = ObjectWriterInjector.getAndClear();
+        if (mod == null) {
+            final ClassLoader tccl = Thread.currentThread().getContextClassLoader();
+            mod = ResteasyObjectWriterInjector.get(tccl);
+        }
+        if (mod != null) {
+            writer = mod.modify(endpoint, httpHeaders, value, writer);
+        }
+
+        try (JsonGenerator jg = _createGenerator(writer, entityStream, enc)) {
+            writer.writeValue(jg, value);
+        }
+    }
+
+    private void initializeFeatures() {
+        if (needsFeatureInit) {
+            synchronized (this) {
+                if (needsFeatureInit) {
+                    final ContextResolver<JacksonProviderConfig> resolver = providers.getContextResolver(
+                            JacksonProviderConfig.class,
+                            MediaType.WILDCARD_TYPE);
+                    if (resolver != null) {
+                        final JacksonProviderConfig config = resolver.getContext(JacksonProviderConfig.class);
+                        if (config != null) {
+                            config.disabledFeatures().forEach(this::disable);
+                            config.enabledFeatures().forEach(this::enable);
+                        }
+                    }
+                    needsFeatureInit = false;
+                }
+            }
+        }
+    }
+
+    private record ClassAnnotationKey(AnnotationArrayKey annotations, ClassKey classKey) {
     }
 
     // Alternative to Jackson's AnnotationBundleKey that uses object equality
@@ -125,12 +273,6 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
             this.hash = calcHash(this.annotations);
         }
 
-        private static int calcHash(Annotation[] annotations) {
-            int result = annotations.length;
-            result = 31 * result + Arrays.hashCode(annotations);
-            return result;
-        }
-
         @Override
         public int hashCode() {
             return hash;
@@ -143,59 +285,34 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
             if (object == null || getClass() != object.getClass())
                 return false;
             AnnotationArrayKey that = (AnnotationArrayKey) object;
-            return hash == that.hash && java.util.Arrays.equals(annotations, that.annotations);
+            return hash == that.hash && Arrays.equals(annotations, that.annotations);
+        }
+
+        private static int calcHash(Annotation[] annotations) {
+            int result = annotations.length;
+            result = 31 * result + Arrays.hashCode(annotations);
+            return result;
         }
     }
-
-    @Override
-    public Object readFrom(Class<Object> type, final Type genericType, Annotation[] annotations, MediaType mediaType,
-            MultivaluedMap<String, String> httpHeaders, InputStream entityStream)
-            throws JacksonException {
-        JacksonLogger.LOGGER.debugf("Provider : %s,  Method : readFrom", getClass().getName());
-        ClassAnnotationKey key = new ClassAnnotationKey(type, annotations);
-        JsonEndpointConfig endpoint;
-        endpoint = _readers.get(key);
-        // not yet resolved (or not cached any more)? Resolve!
-        if (endpoint == null) {
-            JsonMapper mapper = locateMapper(type, mediaType)
-                    .rebuild()
-                    .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
-                    .build();
-            // TODO (jrp) for now we will always add our AllowListPolymorphicTypeValidatorBuilder, but we need to
-            // TODO (jrp) determine if that is correct.
-            //PolymorphicTypeValidator ptv = mapper.getPolymorphicTypeValidator();
-            //the check is protected by test dev.resteasy.providers.jackson.allowlist.JacksonConfig,
-            //be sure to keep that in synch if changing anything here.
-            //if (ptv == null || ptv instanceof LaissezFaireSubTypeValidator) {
-            //    mapper.setPolymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build());
-            //}
-            endpoint = _configForReading(mapper, annotations, null);
-            _readers.put(key, endpoint);
-        }
-        final ObjectReader reader = endpoint.getReader();
-        try (JsonParser jp = _createParser(reader, entityStream)) {
-            // If null is returned, considered to be empty stream
-            if (jp == null) {
-                return null;
-            } else if (jp.nextToken() == null) {
-                return null;
-            }
-
-            // [Issue#1]: allow 'binding' to JsonParser
-            if (((Class<?>) type) == JsonParser.class) {
-                return jp;
-            }
-            return reader.forType(reader.getTypeFactory().constructType(genericType)).readValue(jp);
-        }
-    }
-
-    // TODO (jrp) no need to expose this
-    protected final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> _writers = new ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig>();
 
     private static final class LazyByteArrayOutputStream extends OutputStream {
 
         private byte[] buf;
         private int count;
+
+        @Override
+        public void write(int b) {
+            ensureCapacity(count + 1);
+            buf[count] = (byte) b;
+            count++;
+        }
+
+        @Override
+        public void write(byte[] b, int off, int len) throws IOException {
+            ensureCapacity(count + len);
+            System.arraycopy(b, off, buf, count, len);
+            count += len;
+        }
 
         private void ensureCapacity(int minCapacity) {
             if (minCapacity < 0) {
@@ -222,157 +339,6 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
                 }
             }
             buf = Arrays.copyOf(buf, newCapacity);
-        }
-
-        @Override
-        public void write(int b) {
-            ensureCapacity(count + 1);
-            buf[count] = (byte) b;
-            count++;
-        }
-
-        @Override
-        public void write(byte[] b, int off, int len) throws IOException {
-            ensureCapacity(count + len);
-            System.arraycopy(b, off, buf, count, len);
-            count += len;
-        }
-    }
-
-    private static final byte[] EMPTY = new byte[0];
-
-    @Override
-    public CompletionStage<Void> asyncWriteTo(Object t, Class<?> type, Type genericType, Annotation[] annotations,
-            MediaType mediaType, MultivaluedMap<String, Object> httpHeaders, AsyncOutputStream entityStream) {
-        LazyByteArrayOutputStream bos = new LazyByteArrayOutputStream();
-        try {
-            writeTo(t, type, genericType, annotations, mediaType, httpHeaders, bos);
-            byte[] array = bos.buf;
-            if (array == null) {
-                array = EMPTY;
-            }
-            bos.buf = null;
-            return entityStream.asyncWrite(array, 0, bos.count);
-        } catch (WebApplicationException | JacksonException e) {
-            return ProviderHelper.completedException(e);
-        }
-    }
-
-    @Override
-    public void writeTo(Object value, Class<?> type, Type genericType, Annotation[] annotations, MediaType mediaType,
-            MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream)
-            throws JacksonException {
-        JacksonLogger.LOGGER.debugf("Provider : %s,  Method : writeTo", getClass().getName());
-        entityStream = new DelegatingOutputStream(entityStream) {
-            @Override
-            public void flush() throws IOException {
-                // don't flush as this is a performance hit on Undertow.
-                // and causes chunked encoding to happen.
-            }
-        };
-        ClassAnnotationKey key = new ClassAnnotationKey(type, annotations);
-        JsonEndpointConfig endpoint;
-        endpoint = _writers.get(key);
-
-        // not yet resolved (or not cached any more)? Resolve!
-        if (endpoint == null) {
-            JsonMapper mapper = locateMapper(type, mediaType)
-                    .rebuild()
-                    .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
-                    .build();
-            // TODO (jrp) for now we will always add our AllowListPolymorphicTypeValidatorBuilder, but we need to
-            // TODO (jrp) determine if that is correct.
-            //PolymorphicTypeValidator ptv = mapper.getPolymorphicTypeValidator();
-            //the check is protected by test dev.resteasy.providers.jackson.allowlist.JacksonConfig,
-            //be sure to keep that in synch if changing anything here.
-            //if (ptv == null || ptv instanceof LaissezFaireSubTypeValidator) {
-            //    mapper.setPolymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build());
-            //}
-            endpoint = _configForWriting(mapper, annotations, null);
-
-            // and cache for future reuse
-            _writers.put(key, endpoint);
-        }
-
-        ObjectWriter writer = endpoint.getWriter()
-                .withFeatures(StreamWriteFeature.AUTO_CLOSE_TARGET);
-
-        /*
-         * 27-Feb-2009, tatu: Where can we find desired encoding? Within
-         * HTTP headers?
-         */
-        JsonEncoding enc = findEncoding(mediaType, httpHeaders);
-
-        try (JsonGenerator jg = writer.createGenerator(entityStream, enc)) {
-            // Want indentation?
-            // TODO (jrp) verify if we also need to check the mapper here
-            if (writer.isEnabled(SerializationFeature.INDENT_OUTPUT)) {
-                //jg.useDefaultPrettyPrinter();
-            }
-            // 04-Mar-2010, tatu: How about type we were given? (if any)
-            JavaType rootType = null;
-
-            if (genericType != null && value != null) {
-                /*
-                 * 10-Jan-2011, tatu: as per [JACKSON-456], it's not safe to just force root
-                 * type since it prevents polymorphic type serialization. Since we really
-                 * just need this for generics, let's only use generic type if it's truly
-                 * generic.
-                 */
-                if (genericType.getClass() != Class.class) { // generic types are other impls of 'java.lang.reflect.Type'
-                    /*
-                     * This is still not exactly right; should root type be further
-                     * specialized with 'value.getClass()'? Let's see how well this works before
-                     * trying to come up with more complete solution.
-                     */
-                    rootType = writer.getTypeFactory().constructType(genericType);
-                    /*
-                     * 26-Feb-2011, tatu: To help with [JACKSON-518], we better recognize cases where
-                     * type degenerates back into "Object.class" (as is the case with plain TypeVariable,
-                     * for example), and not use that.
-                     */
-                    if (rootType.getRawClass() == Object.class) {
-                        rootType = null;
-                    }
-                }
-            }
-
-            // Most of the configuration now handled through EndpointConfig, ObjectWriter
-            // but we may need to force root type:
-            if (rootType != null) {
-                writer = writer.forType(rootType);
-            }
-            value = endpoint.modifyBeforeWrite(value);
-            ObjectWriterModifier mod = ObjectWriterInjector.getAndClear();
-            if (mod == null) {
-                final ClassLoader tccl = Thread.currentThread().getContextClassLoader();
-                mod = ResteasyObjectWriterInjector.get(tccl);
-            }
-            if (mod != null) {
-                // TODO (jrp) previously we added the JsonGenerator as the last argument here and we need to figure out
-                // TODO (jrp) why that was and if we still need to do that.
-                writer = mod.modify(endpoint, httpHeaders, value, writer);
-            }
-
-            // [RESTEASY-1317] Support Jackson in Atom links
-            Boolean hasDecorator = decorators.get(key);
-            if (hasDecorator == null) {
-                if (decoratorMatcher.hasDecorator(DecoratedEntityContainer.class, annotations)) {
-                    decoratorMatcher
-                            .decorate(DecoratedEntityContainer.class, new DecoratedEntityContainer(value), type, annotations,
-                                    mediaType);
-                    decorators.put(key, Boolean.TRUE);
-                } else {
-                    decorators.put(key, Boolean.FALSE);
-                }
-            } else {
-                if (hasDecorator) {
-                    decoratorMatcher
-                            .decorate(DecoratedEntityContainer.class, new DecoratedEntityContainer(value), type, annotations,
-                                    mediaType);
-                }
-            }
-            writer.writeValue(jg, value);
         }
     }
 }

@@ -5,31 +5,31 @@
 
 package dev.resteasy.providers.jackson.tracing;
 
-import jakarta.ws.rs.core.Context;
-import jakarta.ws.rs.ext.Providers;
-
 import org.jboss.resteasy.tracing.api.RESTEasyTracingInfoFormat;
 import org.jboss.resteasy.tracing.api.providers.TextBasedRESTEasyTracingInfo;
+
+import dev.resteasy.providers.jackson._private.JacksonLogger;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
 
+/**
+ * Provides JSON-formatted RESTEasy tracing output using Jackson.
+ *
+ * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
+ */
 public class JacksonJsonFormatRESTEasyTracingInfo extends TextBasedRESTEasyTracingInfo {
 
-    // TODO (jrp) can we look this up?
     private static final JsonMapper mapper = JsonMapper.builder()
             .findAndAddModules()
             .build();
-
-    @Context
-    private Providers providers;
 
     @Override
     public String[] getMessages() {
         try {
             return new String[] { mapper.writeValueAsString(pop()) };
         } catch (JacksonException e) {
-            throw new RuntimeException(e);
+            throw JacksonLogger.LOGGER.failedToSerializeTracingMessage(e);
         }
     }
 

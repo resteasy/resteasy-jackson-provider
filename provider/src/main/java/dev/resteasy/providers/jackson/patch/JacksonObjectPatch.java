@@ -10,7 +10,6 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Implementation of {@link ObjectPatch} for JSON Patch (RFC 6902).
- * Uses Jakarta JSON Processing API to apply patch operations.
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */
@@ -26,9 +25,8 @@ class JacksonObjectPatch implements ObjectPatch {
 
     @Override
     public <T> T apply(final T target) {
-        // Convert target POJO to Jakarta JsonValue
         final JsonNode targetJson = objectMapper.convertValue(target, JsonNode.class);
-        // Convert back to POJO
+
         @SuppressWarnings("unchecked")
         final Class<T> targetClass = (Class<T>) target.getClass();
         return objectMapper.convertValue(patch.apply(targetJson), targetClass);

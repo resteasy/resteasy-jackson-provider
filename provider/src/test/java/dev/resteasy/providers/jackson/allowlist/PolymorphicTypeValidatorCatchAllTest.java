@@ -36,12 +36,12 @@ public class PolymorphicTypeValidatorCatchAllTest {
     public static void configureSystemProperty() {
         // We need to set this as a system property until RESTEASY-3747 is resolved. Then we can implement a
         // dev.resteasy.junit.extension.api.ConfigurationProvider which sets the configuration parameter.
-        System.setProperty("dev.resteasy.jackson.deserialization.allowlist.allowIfSubType.prefix", "*");
+        System.setProperty("dev.resteasy.jackson.deserialization.allowlist.allowIfSubType", "*");
     }
 
     @AfterAll
     public static void resetSystemProperty() {
-        System.clearProperty("dev.resteasy.jackson.deserialization.allowlist.allowIfSubType.prefix");
+        System.clearProperty("dev.resteasy.jackson.deserialization.allowlist.allowIfSubType");
     }
 
     @Test

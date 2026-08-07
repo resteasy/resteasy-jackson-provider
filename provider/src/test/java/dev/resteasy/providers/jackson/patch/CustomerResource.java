@@ -15,8 +15,6 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 
-import dev.resteasy.providers.jackson.ResteasyMediaTypes;
-
 /**
  * Test REST resource for patch operations.
  *
@@ -54,7 +52,7 @@ public class CustomerResource {
 
     @PATCH
     @Path("/{id}/merge")
-    @Consumes(ResteasyMediaTypes.APPLICATION_MERGE_PATCH_JSON)
+    @Consumes("application/merge-patch+json")
     public Customer mergePatchCustomer(@PathParam("id") final String id, final ObjectPatch patch) {
         Customer customer = CustomerStore.get(id)
                 .orElseThrow(() -> new NotFoundException("Customer not found: %s".formatted(id)));

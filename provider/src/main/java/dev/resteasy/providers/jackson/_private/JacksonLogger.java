@@ -97,4 +97,10 @@ public interface JacksonLogger extends BasicLogger {
 
     @Message(id = 214, value = "Invalid JSON Pointer in '%s': %s")
     BadRequestException invalidJsonPointer(String field, String value);
+
+    @Message(id = 215, value = "JSON patch data is not a valid array")
+    BadRequestException invalidPatchData();
+
+    @Message(id = 216, value = "Failed to serialize tracing message")
+    RuntimeException failedToSerializeTracingMessage(@Cause Throwable cause);
 }

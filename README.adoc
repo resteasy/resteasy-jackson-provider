@@ -37,7 +37,7 @@ Add the RESTEasy Jackson Provider to your project:
         <dependency>
             <groupId>tools.jackson</groupId>
             <artifactId>jackson-bom</artifactId>
-            <version>${version.com.fasterxml.jackson}</version>
+            <version>${version.tools.jackson}</version>
             <type>pom</type>
             <scope>import</scope>
         </dependency>
@@ -176,7 +176,7 @@ Once everything is setup, you simply need to run the `./release.sh` script. Ther
 . `-r` or `--release` which is the version you want to release
 . `-d` or `--development` which is the next development version.
 
-By default the release version cannot contain `SNAPSHOT` and the development version, must container `SNAPSHOT`.
+By default, the release version cannot contain `SNAPSHOT` and the development version, must contain `SNAPSHOT`.
 
 .Example command:
 
