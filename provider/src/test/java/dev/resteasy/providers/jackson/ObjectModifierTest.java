@@ -14,13 +14,11 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.client.Entity;
 import jakarta.ws.rs.client.WebTarget;
-import jakarta.ws.rs.container.ContainerRequestContext;
-import jakarta.ws.rs.container.ContainerRequestFilter;
 import jakarta.ws.rs.core.GenericType;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.ext.Provider;
+import jakarta.ws.rs.ext.ContextResolver;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
@@ -37,21 +35,19 @@ import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
 import tools.jackson.databind.SerializationFeature;
 import tools.jackson.jakarta.rs.cfg.EndpointConfigBase;
-import tools.jackson.jakarta.rs.cfg.ObjectReaderInjector;
 import tools.jackson.jakarta.rs.cfg.ObjectReaderModifier;
-import tools.jackson.jakarta.rs.cfg.ObjectWriterInjector;
 import tools.jackson.jakarta.rs.cfg.ObjectWriterModifier;
 
 /**
  * Tests that {@link ResteasyJacksonProvider} correctly applies {@link ObjectReaderModifier} and
- * {@link ObjectWriterModifier} when injected via {@link ObjectReaderInjector} and {@link ObjectWriterInjector}.
+ * {@link ObjectWriterModifier} when resolved via a {@link jakarta.ws.rs.ext.ContextResolver}.
  *
  * @author <a href="mailto:jperkins@ibm.com">James R. Perkins</a>
  */
 @RestBootstrap({
         ObjectModifierTest.ModifierResource.class,
-        ObjectModifierTest.WriterModifierFilter.class,
-        ObjectModifierTest.ReaderModifierFilter.class,
+        ObjectModifierTest.WriterModifierContextResolver.class,
+        ObjectModifierTest.ReaderModifierContextResolver.class,
 })
 class ObjectModifierTest {
 
@@ -101,27 +97,25 @@ class ObjectModifierTest {
                 .request()
                 .post(Entity.entity(json, MediaType.APPLICATION_JSON_TYPE))) {
             Assertions.assertEquals(200, response.getStatus());
-            final Map<String, Object> result = response.readEntity(new GenericType<Map<String, Object>>() {
+            final Map<String, Object> result = response.readEntity(new GenericType<>() {
             });
             Assertions.assertEquals("Alice", result.get("name"));
         }
     }
 
-    @Provider
-    public static class WriterModifierFilter implements ContainerRequestFilter {
+    public static class WriterModifierContextResolver implements ContextResolver<ObjectWriterModifier> {
+
         @Override
-        public void filter(final ContainerRequestContext requestContext) {
-            ObjectWriterInjector.set(new IndentingWriterModifier());
+        public ObjectWriterModifier getContext(final Class<?> type) {
+            return new IndentingWriterModifier();
         }
     }
 
-    @Provider
-    public static class ReaderModifierFilter implements ContainerRequestFilter {
+    public static class ReaderModifierContextResolver implements ContextResolver<ObjectReaderModifier> {
+
         @Override
-        public void filter(final ContainerRequestContext requestContext) {
-            if ("POST".equals(requestContext.getMethod())) {
-                ObjectReaderInjector.set(new StrictReaderModifier());
-            }
+        public ObjectReaderModifier getContext(final Class<?> type) {
+            return new StrictReaderModifier();
         }
     }
 

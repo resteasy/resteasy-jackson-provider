@@ -56,33 +56,89 @@ The provider includes a `JsonProcessingExceptionMapper` that maps Jackson's `Jac
 (Bad Request) response. The response body contains a generic error message. Exception details are logged at ERROR
 level but are not exposed in the response to avoid leaking internal information.
 
-=== ObjectWriter Injection
+=== ObjectWriter and ObjectReader Modifiers
 
-The `ResteasyObjectWriterInjector` allows customizing the Jackson `ObjectWriter` on a per-classloader basis. This
-is useful in servlet filter scenarios where the thread serving the filter may differ from the thread executing the
-resource endpoint.
+The provider supports customizing Jackson's `ObjectWriter` and `ObjectReader` at request time via modifier injection.
+This allows you to alter serialization or deserialization behavior on a per-request basis: for example, enabling
+indented output, adding response headers, or enforcing strict deserialization rules.
+
+To inject a modifier, register a `ContextResolver<ObjectWriterModifier>` or `ContextResolver<ObjectReaderModifier>` as
+a Jakarta REST provider. The provider looks up the modifier via this resolver before each write or read operation.
+
+==== ObjectWriterModifier
+
+An `ObjectWriterModifier` can modify the `ObjectWriter` and the response headers before serialization.
 
 [source,java]
 ----
-public class ObjectWriterModifierFilter implements Filter {
-
-    private static final ObjectFilterModifier modifier = new ObjectFilterModifier();
+public class IndentingWriterModifier extends ObjectWriterModifier {
 
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response,
-            FilterChain chain) throws IOException, ServletException {
-        ResteasyObjectWriterInjector.set(
-                Thread.currentThread().getContextClassLoader(), modifier);
-        chain.doFilter(request, response);
+    public ObjectWriter modify(final EndpointConfigBase<?> endpoint,
+            final MultivaluedMap<String, Object> responseHeaders,
+            final Object valueToWrite,
+            final ObjectWriter w) throws JacksonException {
+        return w.with(SerializationFeature.INDENT_OUTPUT);
     }
 }
 ----
 
-The modifier is stored in a `WeakHashMap` keyed by classloader, so it is automatically cleaned up when the
-classloader is garbage collected.
+Register the modifier via a `ContextResolver`:
 
-For cases where the resource endpoint runs on the same thread, Jackson's built-in `ObjectWriterInjector` can be used
-instead via a `WriterInterceptor`.
+[source,java]
+----
+@Provider
+public class WriterModifierResolver implements ContextResolver<ObjectWriterModifier> {
+
+    @Override
+    public ObjectWriterModifier getContext(final Class<?> type) {
+        return new IndentingWriterModifier();
+    }
+}
+----
+
+==== ObjectReaderModifier
+
+An `ObjectReaderModifier` can modify the `ObjectReader` and the `JsonParser` before deserialization.
+
+[source,java]
+----
+public class StrictReaderModifier extends ObjectReaderModifier {
+
+    @Override
+    public ObjectReader modify(final EndpointConfigBase<?> endpoint,
+            final MultivaluedMap<String, String> httpHeaders,
+            final JavaType resultType,
+            final ObjectReader r,
+            final JsonParser p) throws JacksonException {
+        return r.with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+    }
+}
+----
+
+Register the modifier via a `ContextResolver`:
+
+[source,java]
+----
+@Provider
+public class ReaderModifierResolver implements ContextResolver<ObjectReaderModifier> {
+
+    @Override
+    public ObjectReaderModifier getContext(final Class<?> type) {
+        return new StrictReaderModifier();
+    }
+}
+----
+
+The `ContextResolver` receives the type being serialized or deserialized, allowing different modifier behavior per type
+if needed.
+
+NOTE: Jackson also provides `ObjectWriterInjector` and `ObjectReaderInjector`, which use a `ThreadLocal` to pass a
+modifier from a filter into the provider. These work when the filter and the resource endpoint execute on the same
+thread, but are unreliable in Jakarta EE containers where the request may be dispatched across threads. The
+`ContextResolver` approach is recommended as it is container-safe and does not depend on thread affinity. If both a
+`ThreadLocal` modifier and a `ContextResolver` are present, the `ThreadLocal` modifier takes precedence and the
+`ContextResolver` is not consulted.
 
 === Tracing Integration
 
