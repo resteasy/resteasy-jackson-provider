@@ -14,7 +14,7 @@
 
     <groupId>dev.resteasy.providers</groupId>
     <artifactId>resteasy-jackson-provider-parent</artifactId>
-    <version>1.0.0.Alpha2-SNAPSHOT</version>
+    <version>1.0.0.Beta1</version>
     <packaging>pom</packaging>
     <name>RESTEasy Jackson Provider - Parent</name>
     <description>A Jakarta REST provider for Jackson with RESTEasy</description>
@@ -54,7 +54,7 @@
         <connection>scm:git:git://github.com/resteasy/resteasy-jackson-provider.git</connection>
         <developerConnection>scm:git:git@github.com:resteasy/resteasy-jackson-provider.git</developerConnection>
         <url>https://github.com/resteasy/resteasy-jackson-provider</url>
-        <tag>HEAD</tag>
+        <tag>v1.0.0.Beta1</tag>
     </scm>
 
     <issueManagement>
