@@ -79,7 +79,7 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
     public Object readFrom(final Class<Object> type, final Type genericType, final Annotation[] annotations,
             final MediaType mediaType, final MultivaluedMap<String, String> httpHeaders, final InputStream entityStream)
             throws JacksonException, NoContentException {
-        initializeFeatures(type, mediaType);
+        initializeFeatures();
         JacksonLogger.LOGGER.debugf("Provider : %s,  Method : readFrom", getClass().getName());
         final ClassAnnotationKey key = new ClassAnnotationKey(new AnnotationArrayKey(annotations), new ClassKey(type));
         JsonEndpointConfig endpoint = readers.get(key);
@@ -148,7 +148,7 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
     public CompletionStage<Void> asyncWriteTo(final Object t, final Class<?> type, final Type genericType,
             final Annotation[] annotations, final MediaType mediaType, final MultivaluedMap<String, Object> httpHeaders,
             final AsyncOutputStream entityStream) {
-        initializeFeatures(type, mediaType);
+        initializeFeatures();
         final LazyByteArrayOutputStream bos = new LazyByteArrayOutputStream();
         try {
             writeTo(t, type, genericType, annotations, mediaType, httpHeaders, bos);
@@ -167,7 +167,7 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
     public void writeTo(Object value, final Class<?> type, final Type genericType, final Annotation[] annotations,
             final MediaType mediaType, final MultivaluedMap<String, Object> httpHeaders, OutputStream entityStream)
             throws JacksonException {
-        initializeFeatures(type, mediaType);
+        initializeFeatures();
         JacksonLogger.LOGGER.debugf("Provider : %s,  Method : writeTo", getClass().getName());
         entityStream = new DelegatingOutputStream(entityStream) {
             @Override
@@ -233,14 +233,15 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
         }
     }
 
-    private void initializeFeatures(final Class<?> type, final MediaType mediaType) {
+    private void initializeFeatures() {
         if (needsFeatureInit) {
             synchronized (this) {
                 if (needsFeatureInit) {
-                    final ContextResolver<JacksonProviderConfig> resolver = providers
-                            .getContextResolver(JacksonProviderConfig.class, mediaType);
+                    final ContextResolver<JacksonProviderConfig> resolver = providers.getContextResolver(
+                            JacksonProviderConfig.class,
+                            MediaType.WILDCARD_TYPE);
                     if (resolver != null) {
-                        final JacksonProviderConfig config = resolver.getContext(type);
+                        final JacksonProviderConfig config = resolver.getContext(JacksonProviderConfig.class);
                         if (config != null) {
                             config.disabledFeatures().forEach(this::disable);
                             config.enabledFeatures().forEach(this::enable);
