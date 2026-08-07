@@ -15,6 +15,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.MultivaluedMap;
 import jakarta.ws.rs.ext.MessageBodyReader;
 
+import dev.resteasy.providers.jackson.ObjectPatch;
 import dev.resteasy.providers.jackson._private.JacksonLogger;
 
 import tools.jackson.databind.JsonNode;

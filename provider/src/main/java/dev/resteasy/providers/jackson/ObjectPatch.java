@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package dev.resteasy.providers.jackson.patch;
+package dev.resteasy.providers.jackson;
 
 /**
  * Format-agnostic interface for applying patches to objects. Implementations handle specific patch formats like

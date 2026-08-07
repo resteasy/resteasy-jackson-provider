@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-package dev.resteasy.providers.jackson.api;
+package dev.resteasy.providers.jackson;
 
 import java.util.Set;
 
