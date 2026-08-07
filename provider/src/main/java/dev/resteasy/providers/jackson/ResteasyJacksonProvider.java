@@ -122,7 +122,14 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
         }
 
         // Allow modification by filter-injectable thing
-        final ObjectReaderModifier mod = ObjectReaderInjector.getAndClear();
+        ObjectReaderModifier mod = ObjectReaderInjector.getAndClear();
+        if (mod == null) {
+            final ContextResolver<ObjectReaderModifier> resolver = providers.getContextResolver(ObjectReaderModifier.class,
+                    mediaType);
+            if (resolver != null) {
+                mod = resolver.getContext(type);
+            }
+        }
         if (mod != null) {
             reader = mod.modify(endpoint, httpHeaders, resolvedType, reader, p);
         }
@@ -221,8 +228,11 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
         value = endpoint.modifyBeforeWrite(value);
         ObjectWriterModifier mod = ObjectWriterInjector.getAndClear();
         if (mod == null) {
-            final ClassLoader tccl = Thread.currentThread().getContextClassLoader();
-            mod = ResteasyObjectWriterInjector.get(tccl);
+            final ContextResolver<ObjectWriterModifier> resolver = providers.getContextResolver(ObjectWriterModifier.class,
+                    mediaType);
+            if (resolver != null) {
+                mod = resolver.getContext(type);
+            }
         }
         if (mod != null) {
             writer = mod.modify(endpoint, httpHeaders, value, writer);
