@@ -22,7 +22,6 @@ import org.junit.jupiter.api.Test;
 import dev.resteasy.junit.extension.annotations.RequestPath;
 import dev.resteasy.junit.extension.annotations.RestBootstrap;
 import dev.resteasy.junit.extension.annotations.RestResource;
-import dev.resteasy.providers.jackson.api.JacksonProviderConfig;
 
 import tools.jackson.jakarta.rs.cfg.JakartaRSFeature;
 

@@ -5,6 +5,8 @@
 
 package dev.resteasy.providers.jackson.patch;
 
+import dev.resteasy.providers.jackson.ObjectPatch;
+
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 

@@ -5,7 +5,7 @@
 The provider includes support for modifying resources using JSON Patch
 (https://datatracker.ietf.org/doc/html/rfc6902[RFC 6902]) and JSON Merge Patch
 (https://datatracker.ietf.org/doc/html/rfc7396[RFC 7396]). Both use the
-`dev.resteasy.providers.jackson.patch.ObjectPatch` interface as the parameter type in resource methods. The media
+`dev.resteasy.providers.jackson.ObjectPatch` interface as the parameter type in resource methods. The media
 type on `@Consumes` determines which patch format is used.
 
 === JSON Patch (RFC 6902)

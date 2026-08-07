@@ -30,7 +30,6 @@ import org.jboss.resteasy.spi.AsyncOutputStream;
 import org.jboss.resteasy.util.DelegatingOutputStream;
 
 import dev.resteasy.providers.jackson._private.JacksonLogger;
-import dev.resteasy.providers.jackson.api.JacksonProviderConfig;
 
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonEncoding;
