@@ -27,7 +27,7 @@
         <version.org.jboss.resteasy.extensions>2.0.2.Final</version.org.jboss.resteasy.extensions>
         <version.org.jboss.resteasy.junit>1.0.0.Beta5</version.org.jboss.resteasy.junit>
         <version.org.junit>6.1.2</version.org.junit>
-        <version.tools.jackson>3.1.5</version.tools.jackson>
+        <version.tools.jackson>3.1.6</version.tools.jackson>
     </properties>
 
     <dependencyManagement>
