@@ -13,6 +13,7 @@ import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.Produces;
@@ -66,8 +67,8 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
 
     private static final byte[] EMPTY = new byte[0];
 
-    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> readers = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<ClassAnnotationKey, JsonEndpointConfig> writers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<ClassAnnotationKey, JsonEndpointConfig> readers = new ConcurrentHashMap<>();
+    private final ConcurrentMap<ClassAnnotationKey, JsonEndpointConfig> writers = new ConcurrentHashMap<>();
 
     @Context
     private Providers providers;
@@ -81,18 +82,16 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
         initializeFeatures();
         JacksonLogger.LOGGER.debugf("Provider : %s,  Method : readFrom", getClass().getName());
         final ClassAnnotationKey key = new ClassAnnotationKey(new AnnotationArrayKey(annotations), new ClassKey(type));
-        JsonEndpointConfig endpoint = readers.get(key);
-        // not yet resolved (or not cached any more)? Resolve!
-        if (endpoint == null) {
+        JsonEndpointConfig endpoint = readers.computeIfAbsent(key, __ -> {
             JsonMapper mapper = locateMapper(type, mediaType);
             if (mapper.deserializationConfig().getPolymorphicTypeValidator() instanceof DefaultBaseTypeLimitingValidator) {
                 mapper = mapper.rebuild()
                         .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
                         .build();
             }
-            endpoint = _configForReading(mapper, annotations, _defaultReadView);
-            readers.put(key, endpoint);
-        }
+            return _configForReading(mapper, annotations, _defaultReadView);
+        });
+
         ObjectReader reader = endpoint.getReader();
         final JsonParser p = _createParser(reader, entityStream);
 
@@ -183,21 +182,15 @@ public class ResteasyJacksonProvider extends JacksonJsonProvider implements Asyn
             }
         };
         final ClassAnnotationKey key = new ClassAnnotationKey(new AnnotationArrayKey(annotations), new ClassKey(type));
-        JsonEndpointConfig endpoint = writers.get(key);
-
-        // not yet resolved (or not cached any more)? Resolve!
-        if (endpoint == null) {
+        JsonEndpointConfig endpoint = writers.computeIfAbsent(key, __ -> {
             JsonMapper mapper = locateMapper(type, mediaType);
             if (mapper.serializationConfig().getPolymorphicTypeValidator() instanceof DefaultBaseTypeLimitingValidator) {
                 mapper = mapper.rebuild()
                         .polymorphicTypeValidator(new AllowListPolymorphicTypeValidatorBuilder().build())
                         .build();
             }
-            endpoint = _configForWriting(mapper, annotations, _defaultWriteView);
-
-            // and cache for future reuse
-            writers.put(key, endpoint);
-        }
+            return _configForWriting(mapper, annotations, _defaultWriteView);
+        });
 
         // Any headers we should write?
         _modifyHeaders(value, type, genericType, annotations, httpHeaders, endpoint);
