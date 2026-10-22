@@ -1,0 +1,9 @@
+#
+# Copyright The RESTEasy Authors
+# SPDX-License-Identifier: Apache-2.0
+#
+
+dev.resteasy.providers.jackson.ResteasyJacksonProvider
+dev.resteasy.providers.jackson.JsonProcessingExceptionMapper
+dev.resteasy.providers.jackson.patch.JsonPatchReader
+dev.resteasy.providers.jackson.patch.JsonMergePatchReader
